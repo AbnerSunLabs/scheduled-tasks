@@ -1,0 +1,71 @@
+name: 同步指数数据到 Supabase
+
+on:
+  schedule:
+    # GitHub cron uses UTC. These run at 15:10, 15:30 and 16:00 Asia/Shanghai.
+    - cron: "10,30 7 * * 1-5"
+    - cron: "0 8 * * 1-5"
+  workflow_dispatch:
+    inputs:
+      index_codes:
+        description: "Optional comma-separated index codes override"
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  sync-indices:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Validate required configuration
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          TUSHARE_TOKEN: ${{ secrets.TUSHARE_TOKEN }}
+          DATA_API: ${{ secrets.DATA_API }}
+          INDEX_CODES: ${{ inputs.index_codes || vars.INDEX_CODES }}
+        run: |
+          missing=0
+          if [ -z "$DATABASE_URL" ]; then
+            echo "::error::Missing required GitHub Secret: DATABASE_URL"
+            missing=1
+          fi
+          if [ -z "$TUSHARE_TOKEN" ]; then
+            echo "::error::Missing required GitHub Secret: TUSHARE_TOKEN"
+            missing=1
+          fi
+          if [ -z "$DATA_API" ]; then
+            echo "::error::Missing required GitHub Secret: DATA_API"
+            missing=1
+          fi
+          if [ -z "$INDEX_CODES" ]; then
+            echo "::error::Missing required GitHub Variable: INDEX_CODES"
+            missing=1
+          fi
+          if [ "$missing" -ne 0 ]; then
+            exit 1
+          fi
+
+      - name: Install dependencies
+        run: python -m pip install -e .
+
+      - name: Sync index data
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          TUSHARE_TOKEN: ${{ secrets.TUSHARE_TOKEN }}
+          DATA_API: ${{ secrets.DATA_API }}
+          DATA_API_SCHEME: ${{ secrets.DATA_API_SCHEME }}
+          TUSHARE_SYNC_PROXY_ENV: ${{ secrets.TUSHARE_SYNC_PROXY_ENV }}
+          INDEX_CODES: ${{ inputs.index_codes || vars.INDEX_CODES }}
+        run: python -m scheduled_tasks.jobs.sync_indices
