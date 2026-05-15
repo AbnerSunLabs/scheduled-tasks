@@ -19,6 +19,9 @@ dev = [
 pythonpath = ["src"]
 testpaths = ["tests"]
 
+[tool.setuptools.package-data]
+scheduled_tasks = ["data/indices/*.json"]
+
 [tool.ruff]
 line-length = 100
 target-version = "py311"
