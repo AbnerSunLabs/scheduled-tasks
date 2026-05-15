@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import json
 import os
 import re
 from dataclasses import dataclass
+from functools import lru_cache
+from importlib import resources
 
 INDEX_CODE_RE = re.compile(r"^\d{6}\.(SH|SZ|CSI)$")
 
@@ -53,7 +56,37 @@ def load_settings() -> Settings:
     )
 
 
+@lru_cache(maxsize=1)
+def load_supported_index_metas() -> dict[str, IndexMeta]:
+    data_path = resources.files("scheduled_tasks").joinpath(
+        "data/indices/supported-indices.json"
+    )
+    rows = json.loads(data_path.read_text(encoding="utf-8"))
+    metas: dict[str, IndexMeta] = {}
+    for row in rows:
+        code = str(row.get("code", "")).strip().upper()
+        name = str(row.get("name", "")).strip()
+        category = str(row.get("category", "")).strip()
+        display_order = row.get("displayOrder")
+        if not INDEX_CODE_RE.match(code):
+            continue
+        if not name or not category:
+            continue
+        if not isinstance(display_order, int):
+            continue
+        metas[code] = IndexMeta(
+            code=code,
+            name=name,
+            category=category,
+            display_order=display_order,
+        )
+    return metas
+
+
 def infer_index_meta(code: str, display_order: int) -> IndexMeta:
+    meta = load_supported_index_metas().get(code)
+    if meta:
+        return meta
     return IndexMeta(
         code=code,
         name=code,

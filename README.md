@@ -11,6 +11,8 @@ database, schema, sync jobs, and verification workflow. It does not change
 - Sync configured index codes from TuShare into Supabase PostgreSQL.
 - Store index metadata, daily prices, daily valuation points, industry weights,
   and sync run history.
+- Use `src/scheduled_tasks/data/indices/supported-indices.json` as the default
+  metadata map for index name, category, and display order.
 - Provide SQL views for verification and future `stock-view` integration.
 - Keep `INDEX_CODES` in GitHub Repository Variables as comma-separated values.
 
