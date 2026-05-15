@@ -21,13 +21,13 @@ Use Supabase Studio as the primary online verification surface.
 
 Variables:
 
-- `INDEX_CODES`
+- `INDEX_CODES`: configured
 
 Required Secrets:
 
-- `DATABASE_URL`
-- `TUSHARE_TOKEN`
-- `DATA_API`
+- `DATABASE_URL`: pending until the Supabase project is created
+- `TUSHARE_TOKEN`: configured
+- `DATA_API`: configured
 
 Optional Secrets:
 
