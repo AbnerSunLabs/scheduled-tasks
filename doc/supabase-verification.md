@@ -68,6 +68,17 @@ limit 10;
 ```
 
 ```sql
+-- full 后应接近全历史；price_source 应为 yfinance；复权列非空
+select
+  count(*) as rows,
+  count(*) filter (where price_source = 'yfinance') as yfinance_rows,
+  count(*) filter (where close_qfq is null or close_hfq is null) as missing_adj,
+  min(trade_date) as first_date,
+  max(trade_date) as last_date
+from etf_daily;
+```
+
+```sql
 select count(*) as pool_size
 from etf_pool_snapshots
 where etf_code not in ('512660', '159992');

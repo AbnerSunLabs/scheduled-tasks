@@ -1,14 +1,14 @@
-"""AkShare ETF merge unit tests（不连远端）。"""
+"""yfinance ETF merge unit tests（不连远端）。"""
 
 from datetime import date
 
 import pandas as pd
 import pytest
 
-from scheduled_tasks.etf.akshare_client import (
-    dataframe_to_ohlc_map,
-    merge_adj_only,
-    merge_three_adjustments,
+from scheduled_tasks.etf.yfinance_client import (
+    build_adj_only,
+    build_three_adjustments,
+    to_yahoo_symbol,
 )
 from scheduled_tasks.jobs.sync_etf_kline_baostock import (
     _needs_adj_refresh,
@@ -16,55 +16,75 @@ from scheduled_tasks.jobs.sync_etf_kline_baostock import (
 )
 
 
-def _bar(d: str, o: str, h: str, low: str, c: str, vol: str = "100", amt: str = "1") -> dict:
-    return {
-        "date": d,
-        "open": o,
-        "high": h,
-        "low": low,
-        "close": c,
-        "volume": vol,
-        "amount": amt,
-    }
+def test_to_yahoo_symbol() -> None:
+    assert to_yahoo_symbol("510300") == "510300.SS"
+    assert to_yahoo_symbol("159915") == "159915.SZ"
+    with pytest.raises(ValueError):
+        to_yahoo_symbol("600000")
 
 
-def test_merge_three_adjustments_ok_volume_lots() -> None:
-    raw = pd.DataFrame([_bar("2024-01-02", "1", "2", "0.5", "1.5", vol="100")])
-    qfq = pd.DataFrame([_bar("2024-01-02", "1.1", "2.1", "0.6", "1.6")])
-    hfq = pd.DataFrame([_bar("2024-01-02", "10", "20", "5", "15")])
-    rows = merge_three_adjustments(raw, qfq, hfq, "510300")
-    assert len(rows) == 1
-    assert rows[0]["volume"] == 100.0  # 东财已是手，不再 ÷100
-    assert rows[0]["close_qfq"] == 1.6
-    assert rows[0]["close_hfq"] == 15.0
-    assert rows[0]["price_source"] == "akshare"
-
-
-def test_merge_three_adjustments_fails_when_qfq_missing() -> None:
-    raw = pd.DataFrame([_bar("2024-01-02", "1", "2", "0.5", "1.5")])
-    qfq = pd.DataFrame([])
-    hfq = pd.DataFrame([_bar("2024-01-02", "10", "20", "5", "15")])
-    with pytest.raises(RuntimeError, match="missing qfq/hfq"):
-        merge_three_adjustments(raw, qfq, hfq, "510300")
-
-
-def test_merge_adj_only_requires_hfq() -> None:
-    qfq = pd.DataFrame([_bar("2024-01-02", "1.1", "2.1", "0.6", "1.6")])
-    hfq = pd.DataFrame([])
-    with pytest.raises(RuntimeError, match="missing hfq"):
-        merge_adj_only(qfq, hfq, "510300")
-
-
-def test_dataframe_to_ohlc_map_skips_incomplete() -> None:
+def test_build_three_adjustments_qfq_hfq() -> None:
+    # 模拟分红：不复权 close 从 10→9，Adj Close 保持连续
     df = pd.DataFrame(
         [
-            _bar("2024-01-02", "1", "2", "0.5", "1.5"),
-            {"date": "2024-01-03", "open": "", "high": "2", "low": "1", "close": "1.5"},
+            {
+                "date": "2024-01-02",
+                "open": 10.0,
+                "high": 10.5,
+                "low": 9.5,
+                "close": 10.0,
+                "adj_close": 9.0,
+                "volume": 10000,
+            },
+            {
+                "date": "2024-01-03",
+                "open": 9.0,
+                "high": 9.2,
+                "low": 8.8,
+                "close": 9.0,
+                "adj_close": 9.0,
+                "volume": 20000,
+            },
         ]
     )
-    m = dataframe_to_ohlc_map(df)
-    assert date(2024, 1, 2) in m
-    assert date(2024, 1, 3) not in m
+    rows = build_three_adjustments(df, "510300")
+    assert len(rows) == 2
+    assert rows[0]["price_source"] == "yfinance"
+    assert rows[0]["volume"] == 100.0  # 股→手
+    # 首日 qfq=adj；hfq 锚定首日不复权 close
+    assert rows[0]["close_qfq"] == pytest.approx(9.0)
+    assert rows[0]["close_hfq"] == pytest.approx(10.0)
+    assert rows[1]["close_qfq"] == pytest.approx(9.0)
+    assert rows[1]["close_hfq"] == pytest.approx(10.0)
+
+
+def test_build_adj_only_shape() -> None:
+    df = pd.DataFrame(
+        [
+            {
+                "date": date(2024, 1, 2),
+                "open": 1.0,
+                "high": 1.1,
+                "low": 0.9,
+                "close": 1.0,
+                "adj_close": 1.0,
+                "volume": 100,
+            }
+        ]
+    )
+    rows = build_adj_only(df, "510300")
+    assert set(rows[0]) == {
+        "etf_code",
+        "trade_date",
+        "open_qfq",
+        "high_qfq",
+        "low_qfq",
+        "close_qfq",
+        "open_hfq",
+        "high_hfq",
+        "low_hfq",
+        "close_hfq",
+    }
 
 
 def test_parse_codes_arg_rejects_excluded() -> None:
