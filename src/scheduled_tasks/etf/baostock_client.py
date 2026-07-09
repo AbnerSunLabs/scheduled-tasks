@@ -83,7 +83,7 @@ def retry_call(
 
 
 def fetch_ipo_date(bs_api: Any, etf_code: str) -> date:
-    """查询上市日；缺失或查询失败则抛错。"""
+    """查询上市日；必须精确匹配 code，禁止取全表第一行。"""
 
     def _do() -> date:
         code = to_baostock_code(etf_code)
@@ -91,11 +91,19 @@ def fetch_ipo_date(bs_api: Any, etf_code: str) -> date:
         df = _query_to_dataframe(rs)
         if df.empty:
             raise RuntimeError(f"empty stock_basic for {etf_code}")
-        # 优先匹配 code 列
-        row = df.iloc[0]
+        if "code" not in df.columns:
+            raise RuntimeError(f"stock_basic missing code column for {etf_code}")
+
+        # BaoStock 偶发忽略 code 过滤返回全表；必须精确匹配，禁止 iloc[0]
+        matched = df[df["code"].astype(str).str.strip() == code]
+        if matched.empty:
+            raise RuntimeError(
+                f"stock_basic returned {len(df)} rows but none matched {code}"
+            )
+        row = matched.iloc[0]
         ipo_raw = None
-        for key in ("ipoDate", "ipo_date", "listDate"):
-            if key in df.columns and str(row[key]).strip():
+        for key in ("ipoDate", "ipo_date", "listDate", "ipoData"):
+            if key in matched.columns and str(row[key]).strip():
                 ipo_raw = str(row[key]).strip()
                 break
         if not ipo_raw or ipo_raw in {"", "None"}:

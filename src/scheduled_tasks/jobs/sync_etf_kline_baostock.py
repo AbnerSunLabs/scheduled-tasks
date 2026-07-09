@@ -213,6 +213,10 @@ def _sync_full_or_incremental_one(
         print(f"[etf] {etf_code}: start {start} > end {end}, skip")
         return 0
 
+    print(
+        f"[etf] {etf_code}: ipo={ipo} last={last_date} "
+        f"range={start}→{end} mode={mode}"
+    )
     raw_df = fetch_kline(bs_api, etf_code, start, end, ADJUST_NONE)
     qfq_df = fetch_kline(bs_api, etf_code, start, end, ADJUST_QFQ)
     hfq_df = fetch_kline(bs_api, etf_code, start, end, ADJUST_HFQ)

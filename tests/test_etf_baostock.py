@@ -22,6 +22,37 @@ def test_to_baostock_code_sh_sz() -> None:
     assert to_baostock_code("159915") == "sz.159915"
 
 
+def test_fetch_ipo_date_requires_exact_code_match(monkeypatch: pytest.MonkeyPatch) -> None:
+    """全表返回时不得取第一行 IPO，否则 full 会只拉近几个月。"""
+    from scheduled_tasks.etf import baostock_client as client
+
+    class FakeRs:
+        error_code = "0"
+        error_msg = "success"
+        fields = ["code", "code_name", "ipoDate", "outDate", "type", "status"]
+
+        def __init__(self) -> None:
+            self._rows = [
+                ["sh.000001", "上证指数", "1991-07-15", "", "2", "1"],
+                ["sh.510300", "沪深300ETF", "2012-05-28", "", "5", "1"],
+            ]
+            self._i = -1
+
+        def next(self) -> bool:
+            self._i += 1
+            return self._i < len(self._rows)
+
+        def get_row_data(self) -> list[str]:
+            return self._rows[self._i]
+
+    class FakeBs:
+        def query_stock_basic(self, code: str = ""):
+            return FakeRs()
+
+    ipo = client.fetch_ipo_date(FakeBs(), "510300")
+    assert ipo == date(2012, 5, 28)
+
+
 def test_to_baostock_code_rejects_invalid() -> None:
     with pytest.raises(ValueError):
         to_baostock_code("600000")
