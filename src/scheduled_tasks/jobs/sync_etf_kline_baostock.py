@@ -1,7 +1,7 @@
-"""Sync ETF daily bars from AkShare into Supabase PostgreSQL.
+"""Sync ETF daily bars from Yahoo Finance into Supabase PostgreSQL.
 
-历史命名保留 sync_etf_kline_baostock：GitHub Actions 海外 runner 上 BaoStock
-日 K 会忽略 start_date 只回近约 122 根，故实际数据源为 AkShare（东财）。
+历史命名保留 sync_etf_kline_baostock。GitHub Actions 海外 runner 上：
+BaoStock 截断、东财/AkShare 断连；实际数据源为 yfinance。
 """
 
 from __future__ import annotations
@@ -28,15 +28,12 @@ from scheduled_tasks.db import (
     update_etf_adj_columns,
     upsert_etf_daily_bars,
 )
-from scheduled_tasks.etf.akshare_client import (
-    ADJUST_HFQ,
-    ADJUST_NONE,
-    ADJUST_QFQ,
+from scheduled_tasks.etf.yfinance_client import (
     DEFAULT_HISTORY_START,
+    build_adj_only,
+    build_three_adjustments,
     fetch_anchor_close_qfq,
-    fetch_kline,
-    merge_adj_only,
-    merge_three_adjustments,
+    fetch_kline_bundle,
 )
 
 JOB_NAME = "sync_etf_kline_baostock"
@@ -46,6 +43,7 @@ ETF_CODE_RE = re.compile(r"^\d{6}$")
 SUMMARY_PATH = Path("artifacts/sync_etf_kline_summary.json")
 DEFAULT_LOOKBACK_DAYS = 5
 DEFAULT_ADJ_EPSILON = 0.001
+PRICE_SOURCE = "yfinance"
 
 
 @dataclass
@@ -130,7 +128,6 @@ def resolve_pool_codes(
     conn: Any,
     cli_codes: tuple[str, ...] | None,
 ) -> tuple[tuple[str, ...], dict[str, Any]]:
-    """返回 (codes, pool_meta)。cli 覆盖时跳过 25 只断言。"""
     if cli_codes is not None:
         meta = {
             "codes_source": "cli",
@@ -178,7 +175,6 @@ def _compute_start(
     cli_start: date | None,
     mode: str,
 ) -> date:
-    """无 IPO 接口时用 DEFAULT_HISTORY_START 作全局下限。"""
     if mode == "full" or last_date is None:
         start = DEFAULT_HISTORY_START
     else:
@@ -214,12 +210,9 @@ def _sync_full_or_incremental_one(
         return 0
 
     print(f"[etf] {etf_code}: last={last_date} range={start}→{end} mode={mode}")
-    raw_df = fetch_kline(etf_code, start, end, ADJUST_NONE)
-    qfq_df = fetch_kline(etf_code, start, end, ADJUST_QFQ)
-    hfq_df = fetch_kline(etf_code, start, end, ADJUST_HFQ)
-    rows = merge_three_adjustments(raw_df, qfq_df, hfq_df, etf_code)
+    df = fetch_kline_bundle(etf_code, start, end)
+    rows = build_three_adjustments(df, etf_code)
 
-    # full 长区间若行数明显偏少，视为异常，避免 silent 成功
     if mode == "full":
         span_days = (end - start).days + 1
         if span_days >= 400 and len(rows) < 200:
@@ -260,8 +253,6 @@ def _sync_adj_check_one(
     cli_end: date | None,
     summary: SyncSummary,
 ) -> str:
-    """返回动作：skipped|refreshed|detect_failed|needs_full。"""
-
     def _finish_read(action: str) -> str:
         conn.commit()
         return action
@@ -295,9 +286,8 @@ def _sync_adj_check_one(
         summary.skipped_codes.append(etf_code)
         return _finish_read("skipped")
 
-    qfq_df = fetch_kline(etf_code, start, end, ADJUST_QFQ)
-    hfq_df = fetch_kline(etf_code, start, end, ADJUST_HFQ)
-    rows = merge_adj_only(qfq_df, hfq_df, etf_code)
+    df = fetch_kline_bundle(etf_code, start, end)
+    rows = build_adj_only(df, etf_code)
     if not rows:
         summary.skipped_codes.append(etf_code)
         return _finish_read("skipped")
@@ -342,7 +332,7 @@ def run_sync(args: argparse.Namespace) -> int:
                 "lookback_days": args.lookback_days,
                 "adj_epsilon": args.adj_epsilon,
                 "force": bool(args.force),
-                "price_source": "akshare",
+                "price_source": PRICE_SOURCE,
                 **pool_meta,
             }
             run_id = create_sync_run(conn, JOB_NAME, codes, meta=meta)
@@ -398,7 +388,7 @@ def run_sync(args: argparse.Namespace) -> int:
 
             finish_meta: dict[str, Any] = {
                 "mode": args.mode,
-                "price_source": "akshare",
+                "price_source": PRICE_SOURCE,
                 "pool_size": summary.pool_size,
                 "snapshot_date_min": summary.snapshot_date_min,
                 "snapshot_date_max": summary.snapshot_date_max,
@@ -458,7 +448,7 @@ def _parse_date(value: str | None) -> date | None:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Sync ETF daily kline from AkShare")
+    parser = argparse.ArgumentParser(description="Sync ETF daily kline from Yahoo Finance")
     parser.add_argument(
         "--mode",
         choices=("full", "incremental", "adj_check"),

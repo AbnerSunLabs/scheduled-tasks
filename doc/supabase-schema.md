@@ -127,7 +127,7 @@ erDiagram
 | `nav` / `premium_rate` / `fund_size` / `listing_days` / `bid_price` / `ask_price` | `numeric`/`integer` | 可空                      | **非本 job 字段**，upsert 不覆盖                                    |
 | `open_qfq` / `high_qfq` / `low_qfq` / `close_qfq`                                 | `numeric(18,4)`     | 可空                      | 前复权 OHLC                                                         |
 | `open_hfq` / `high_hfq` / `low_hfq` / `close_hfq`                                 | `numeric(18,4)`     | 可空                      | 后复权 OHLC                                                         |
-| `price_source`                                                                    | `text`              | 可空                      | 仅表示不复权 OHLCV 来源；本 job 写 `'akshare'`；`adj_check` 不更新 |
+| `price_source`                                                                    | `text`              | 可空                      | 仅表示不复权 OHLCV 来源；本 job 写 `'yfinance'`；`adj_check` 不更新 |
 | `updated_at`                                                                      | `timestamptz`       | NOT NULL, DEFAULT `now()` | 更新时间                                                            |
 
 **索引：** `etf_daily_trade_date_idx`：`(trade_date DESC)`
@@ -157,14 +157,14 @@ erDiagram
 etf_pool_snapshots（只读，全表）
     │
     ▼
-BaoStock（已弃用，海外 runner 截断）/ AkShare（东财）
+yfinance（Yahoo；海外 runner 可用）
     │
-    ├─ full / incremental → etf_daily（三种价 + price_source=akshare）
+    ├─ full / incremental → etf_daily（三种价 + price_source=yfinance）
     ├─ adj_check          → etf_daily（仅 UPDATE *_qfq/*_hfq）
     └─ sync_runs + artifacts/sync_etf_kline_summary.json → Bark
 ```
 
-同步入口：`python -m scheduled_tasks.jobs.sync_etf_kline_baostock`（workflow：`同步 ETF 日 K 到 Supabase`；数据源为 AkShare）。
+同步入口：`python -m scheduled_tasks.jobs.sync_etf_kline_baostock`（workflow：`同步 ETF 日 K 到 Supabase`；数据源为 yfinance）。
 
 ---
 
