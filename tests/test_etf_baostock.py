@@ -6,6 +6,7 @@ import pandas as pd
 import pytest
 
 from scheduled_tasks.etf.baostock_client import (
+    _iter_date_chunks,
     dataframe_to_ohlc_map,
     merge_adj_only,
     merge_three_adjustments,
@@ -20,6 +21,18 @@ from scheduled_tasks.jobs.sync_etf_kline_baostock import (
 def test_to_baostock_code_sh_sz() -> None:
     assert to_baostock_code("510300") == "sh.510300"
     assert to_baostock_code("159915") == "sz.159915"
+
+
+def test_iter_date_chunks_covers_full_range() -> None:
+    from datetime import timedelta
+
+    chunks = list(_iter_date_chunks(date(2020, 1, 1), date(2021, 1, 10), max_days=180))
+    assert chunks[0][0] == date(2020, 1, 1)
+    assert chunks[-1][1] == date(2021, 1, 10)
+    # 相邻 chunk 连续无缺口
+    for prev, cur in zip(chunks, chunks[1:], strict=False):
+        assert cur[0] == prev[1] + timedelta(days=1)
+        assert (prev[1] - prev[0]).days + 1 <= 180
 
 
 def test_fetch_ipo_date_requires_exact_code_match(monkeypatch: pytest.MonkeyPatch) -> None:
