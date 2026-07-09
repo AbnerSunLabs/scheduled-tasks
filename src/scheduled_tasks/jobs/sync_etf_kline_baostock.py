@@ -213,14 +213,22 @@ def _sync_full_or_incremental_one(
         print(f"[etf] {etf_code}: start {start} > end {end}, skip")
         return 0
 
-    print(
-        f"[etf] {etf_code}: ipo={ipo} last={last_date} "
-        f"range={start}→{end} mode={mode}"
-    )
+    print(f"[etf] {etf_code}: ipo={ipo} last={last_date} range={start}→{end} mode={mode}")
     raw_df = fetch_kline(bs_api, etf_code, start, end, ADJUST_NONE)
     qfq_df = fetch_kline(bs_api, etf_code, start, end, ADJUST_QFQ)
     hfq_df = fetch_kline(bs_api, etf_code, start, end, ADJUST_HFQ)
     rows = merge_three_adjustments(raw_df, qfq_df, hfq_df, etf_code)
+
+    # full 长区间若行数明显偏少，视为远端截断/异常，避免 silent 成功
+    if mode == "full":
+        span_days = (end - start).days + 1
+        # 粗略：跨度超过 400 天却不足 200 根，几乎必然缺历史
+        if span_days >= 400 and len(rows) < 200:
+            raise RuntimeError(
+                f"{etf_code}: full range {start}→{end} only returned {len(rows)} bars "
+                f"(span_days={span_days}); possible baostock truncation"
+            )
+
     written = upsert_etf_daily_bars(conn, rows)
     if rows:
         max_d = max(r["trade_date"] for r in rows)

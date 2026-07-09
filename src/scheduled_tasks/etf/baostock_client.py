@@ -5,7 +5,7 @@ from __future__ import annotations
 import time
 from collections.abc import Callable
 from contextlib import contextmanager
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from typing import Any, TypeVar
 
 import baostock as bs
@@ -97,9 +97,7 @@ def fetch_ipo_date(bs_api: Any, etf_code: str) -> date:
         # BaoStock 偶发忽略 code 过滤返回全表；必须精确匹配，禁止 iloc[0]
         matched = df[df["code"].astype(str).str.strip() == code]
         if matched.empty:
-            raise RuntimeError(
-                f"stock_basic returned {len(df)} rows but none matched {code}"
-            )
+            raise RuntimeError(f"stock_basic returned {len(df)} rows but none matched {code}")
         row = matched.iloc[0]
         ipo_raw = None
         for key in ("ipoDate", "ipo_date", "listDate", "ipoData"):
@@ -113,6 +111,17 @@ def fetch_ipo_date(bs_api: Any, etf_code: str) -> date:
     return retry_call(_do)
 
 
+def _iter_date_chunks(start: date, end: date, *, max_days: int = 180):
+    """将长区间切成不超过 max_days 的子区间，规避 BaoStock 长查询截断。"""
+    if start > end:
+        return
+    cursor = start
+    while cursor <= end:
+        chunk_end = min(cursor + timedelta(days=max_days - 1), end)
+        yield cursor, chunk_end
+        cursor = chunk_end + timedelta(days=1)
+
+
 def fetch_kline(
     bs_api: Any,
     etf_code: str,
@@ -120,26 +129,51 @@ def fetch_kline(
     end: date,
     adjustflag: str,
 ) -> pd.DataFrame:
-    """拉取日 K；返回含 date/open/high/low/close/volume/amount/tradestatus 的 DataFrame。"""
+    """拉取日 K；长区间按约半年分段后合并，避免远端静默截断。"""
 
-    def _do() -> pd.DataFrame:
-        code = to_baostock_code(etf_code)
-        fields = "date,code,open,high,low,close,volume,amount,tradestatus"
-        rs = bs_api.query_history_k_data_plus(
-            code,
-            fields,
-            start_date=format_bs_date(start),
-            end_date=format_bs_date(end),
-            frequency="d",
-            adjustflag=adjustflag,
+    frames: list[pd.DataFrame] = []
+    for chunk_start, chunk_end in _iter_date_chunks(start, end):
+
+        def _do(
+            cs: date = chunk_start,
+            ce: date = chunk_end,
+        ) -> pd.DataFrame:
+            code = to_baostock_code(etf_code)
+            fields = "date,code,open,high,low,close,volume,amount,tradestatus"
+            rs = bs_api.query_history_k_data_plus(
+                code,
+                fields,
+                start_date=format_bs_date(cs),
+                end_date=format_bs_date(ce),
+                frequency="d",
+                adjustflag=adjustflag,
+            )
+            return _query_to_dataframe(rs)
+
+        chunk_df = retry_call(_do)
+        if not chunk_df.empty:
+            frames.append(chunk_df)
+
+    if not frames:
+        return pd.DataFrame(
+            columns=[
+                "date",
+                "code",
+                "open",
+                "high",
+                "low",
+                "close",
+                "volume",
+                "amount",
+                "tradestatus",
+            ]
         )
-        df = _query_to_dataframe(rs)
-        if df.empty:
-            return df
-        # 停牌：以不复权 tradestatus=='1' 为准；此处先保留，由调用方按 adjustflag 过滤
-        return df
 
-    return retry_call(_do)
+    df = pd.concat(frames, ignore_index=True)
+    if "date" in df.columns:
+        df = df.drop_duplicates(subset=["date"], keep="last").sort_values("date")
+        df = df.reset_index(drop=True)
+    return df
 
 
 def _to_float(value: Any) -> float | None:
