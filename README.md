@@ -1,13 +1,16 @@
 # scheduled-tasks
 
-GitHub Actions 定时任务：将 BaoStock ETF 日 K 同步到 Supabase PostgreSQL。
+GitHub Actions 定时任务：将 **AkShare（东财）** ETF 日 K 同步到 Supabase PostgreSQL。
+
+> 说明：模块/job 名仍含 `baostock` 为历史命名。GitHub Actions 海外 runner 上 BaoStock
+> 日 K 会忽略 `start_date`、只返回近约 122 根，故实际数据源为 AkShare。
 
 本仓库独立于 `stock-view` / `stock-charts`。指数相关表（`indices` 等）**暂不维护**；当前主任务是 ETF 日 K 入库。
 
 ## 当前范围
 
 - 从 `etf_pool_snapshots` 读取当前池（排除黑名单后断言 25 只）。
-- 写入 `etf_daily`：不复权 OHLCV + 前/后复权 OHLC + `price_source`。
+- 写入 `etf_daily`：不复权 OHLCV + 前/后复权 OHLC + `price_source='akshare'`。
 - 写入 `sync_runs` 执行记录（`job_name=sync_etf_kline_baostock`）。
 - 模式：`full` / `incremental` / `adj_check`。
 - 成功/失败均通过 Bark 推送（`BARK_KEY`）。
@@ -106,7 +109,7 @@ order by etf_code;
 ```sql
 select etf_code, count(*)
 from etf_daily
-where price_source is distinct from 'baostock'
+where price_source is distinct from 'akshare'
 group by etf_code
 order by etf_code;
 ```

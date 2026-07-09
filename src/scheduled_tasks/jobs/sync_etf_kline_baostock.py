@@ -1,4 +1,8 @@
-"""Sync ETF daily bars from BaoStock into Supabase PostgreSQL."""
+"""Sync ETF daily bars from AkShare into Supabase PostgreSQL.
+
+历史命名保留 sync_etf_kline_baostock：GitHub Actions 海外 runner 上 BaoStock
+日 K 会忽略 start_date 只回近约 122 根，故实际数据源为 AkShare（东财）。
+"""
 
 from __future__ import annotations
 
@@ -24,13 +28,12 @@ from scheduled_tasks.db import (
     update_etf_adj_columns,
     upsert_etf_daily_bars,
 )
-from scheduled_tasks.etf.baostock_client import (
+from scheduled_tasks.etf.akshare_client import (
     ADJUST_HFQ,
     ADJUST_NONE,
     ADJUST_QFQ,
-    baostock_session,
+    DEFAULT_HISTORY_START,
     fetch_anchor_close_qfq,
-    fetch_ipo_date,
     fetch_kline,
     merge_adj_only,
     merge_three_adjustments,
@@ -170,16 +173,16 @@ def resolve_pool_codes(
 
 def _compute_start(
     *,
-    ipo: date,
     last_date: date | None,
     lookback_days: int,
     cli_start: date | None,
     mode: str,
 ) -> date:
+    """无 IPO 接口时用 DEFAULT_HISTORY_START 作全局下限。"""
     if mode == "full" or last_date is None:
-        start = ipo
+        start = DEFAULT_HISTORY_START
     else:
-        start = max(ipo, last_date - timedelta(days=lookback_days))
+        start = max(DEFAULT_HISTORY_START, last_date - timedelta(days=lookback_days))
     if cli_start is not None:
         start = max(start, cli_start)
     return start
@@ -187,7 +190,6 @@ def _compute_start(
 
 def _sync_full_or_incremental_one(
     conn: Any,
-    bs_api: Any,
     etf_code: str,
     *,
     mode: str,
@@ -196,14 +198,12 @@ def _sync_full_or_incremental_one(
     cli_end: date | None,
     summary: SyncSummary,
 ) -> int:
-    ipo = fetch_ipo_date(bs_api, etf_code)
     last_date = get_etf_max_trade_date(conn, etf_code)
     if mode == "incremental" and last_date is None:
         summary.backfill_codes.append(etf_code)
 
     end = cli_end or date.today()
     start = _compute_start(
-        ipo=ipo,
         last_date=last_date,
         lookback_days=lookback_days,
         cli_start=cli_start,
@@ -213,20 +213,19 @@ def _sync_full_or_incremental_one(
         print(f"[etf] {etf_code}: start {start} > end {end}, skip")
         return 0
 
-    print(f"[etf] {etf_code}: ipo={ipo} last={last_date} range={start}→{end} mode={mode}")
-    raw_df = fetch_kline(bs_api, etf_code, start, end, ADJUST_NONE)
-    qfq_df = fetch_kline(bs_api, etf_code, start, end, ADJUST_QFQ)
-    hfq_df = fetch_kline(bs_api, etf_code, start, end, ADJUST_HFQ)
+    print(f"[etf] {etf_code}: last={last_date} range={start}→{end} mode={mode}")
+    raw_df = fetch_kline(etf_code, start, end, ADJUST_NONE)
+    qfq_df = fetch_kline(etf_code, start, end, ADJUST_QFQ)
+    hfq_df = fetch_kline(etf_code, start, end, ADJUST_HFQ)
     rows = merge_three_adjustments(raw_df, qfq_df, hfq_df, etf_code)
 
-    # full 长区间若行数明显偏少，视为远端截断/异常，避免 silent 成功
+    # full 长区间若行数明显偏少，视为异常，避免 silent 成功
     if mode == "full":
         span_days = (end - start).days + 1
-        # 粗略：跨度超过 400 天却不足 200 根，几乎必然缺历史
         if span_days >= 400 and len(rows) < 200:
             raise RuntimeError(
                 f"{etf_code}: full range {start}→{end} only returned {len(rows)} bars "
-                f"(span_days={span_days}); possible baostock truncation"
+                f"(span_days={span_days}); possible data truncation"
             )
 
     written = upsert_etf_daily_bars(conn, rows)
@@ -253,7 +252,6 @@ def _needs_adj_refresh(
 
 def _sync_adj_check_one(
     conn: Any,
-    bs_api: Any,
     etf_code: str,
     *,
     force: bool,
@@ -265,7 +263,6 @@ def _sync_adj_check_one(
     """返回动作：skipped|refreshed|detect_failed|needs_full。"""
 
     def _finish_read(action: str) -> str:
-        # 只读/跳过路径显式提交，避免长 idle-in-transaction
         conn.commit()
         return action
 
@@ -281,7 +278,7 @@ def _sync_adj_check_one(
     anchor_date, local_qfq = anchor_info
     if not force:
         try:
-            remote_qfq = fetch_anchor_close_qfq(bs_api, etf_code, anchor_date)
+            remote_qfq = fetch_anchor_close_qfq(etf_code, anchor_date)
             if not _needs_adj_refresh(local_qfq, remote_qfq, epsilon):
                 summary.skipped_codes.append(etf_code)
                 return _finish_read("skipped")
@@ -290,17 +287,16 @@ def _sync_adj_check_one(
             summary.detect_failed_codes.append(etf_code)
             return _finish_read("detect_failed")
 
-    ipo = fetch_ipo_date(bs_api, etf_code)
     end = cli_end or date.today()
-    start = ipo
+    start = DEFAULT_HISTORY_START
     if cli_start is not None:
         start = max(start, cli_start)
     if start > end:
         summary.skipped_codes.append(etf_code)
         return _finish_read("skipped")
 
-    qfq_df = fetch_kline(bs_api, etf_code, start, end, ADJUST_QFQ)
-    hfq_df = fetch_kline(bs_api, etf_code, start, end, ADJUST_HFQ)
+    qfq_df = fetch_kline(etf_code, start, end, ADJUST_QFQ)
+    hfq_df = fetch_kline(etf_code, start, end, ADJUST_HFQ)
     rows = merge_adj_only(qfq_df, hfq_df, etf_code)
     if not rows:
         summary.skipped_codes.append(etf_code)
@@ -309,11 +305,9 @@ def _sync_adj_check_one(
     dates = [r["trade_date"] for r in rows]
     existing = existing_trade_dates(conn, etf_code, dates)
     if len(existing) < len(dates):
-        # 缺主行情：整只零写库
         summary.needs_full_codes.append(etf_code)
         return _finish_read("needs_full")
 
-    # 单只事务：中途异常则 rollback
     try:
         update_etf_adj_columns(conn, rows)
         conn.commit()
@@ -348,65 +342,63 @@ def run_sync(args: argparse.Namespace) -> int:
                 "lookback_days": args.lookback_days,
                 "adj_epsilon": args.adj_epsilon,
                 "force": bool(args.force),
+                "price_source": "akshare",
                 **pool_meta,
             }
             run_id = create_sync_run(conn, JOB_NAME, codes, meta=meta)
 
-            with baostock_session() as bs_api:
-                for etf_code in codes:
-                    try:
-                        print(f"[etf] syncing {etf_code} mode={args.mode}")
-                        if args.mode in {"full", "incremental"}:
-                            written = _sync_full_or_incremental_one(
-                                conn,
-                                bs_api,
-                                etf_code,
-                                mode=args.mode,
-                                lookback_days=args.lookback_days,
-                                cli_start=args.start,
-                                cli_end=args.end,
-                                summary=summary,
+            for etf_code in codes:
+                try:
+                    print(f"[etf] syncing {etf_code} mode={args.mode}")
+                    if args.mode in {"full", "incremental"}:
+                        written = _sync_full_or_incremental_one(
+                            conn,
+                            etf_code,
+                            mode=args.mode,
+                            lookback_days=args.lookback_days,
+                            cli_start=args.start,
+                            cli_end=args.end,
+                            summary=summary,
+                        )
+                        conn.commit()
+                        success_codes.append(etf_code)
+                        print(f"[etf] synced {etf_code}: rows={written}")
+                    else:
+                        action = _sync_adj_check_one(
+                            conn,
+                            etf_code,
+                            force=args.force,
+                            epsilon=args.adj_epsilon,
+                            cli_start=args.start,
+                            cli_end=args.end,
+                            summary=summary,
+                        )
+                        if action in {"detect_failed", "needs_full"}:
+                            reason = (
+                                "detect_failed"
+                                if action == "detect_failed"
+                                else "missing_primary_bars"
                             )
-                            conn.commit()
-                            success_codes.append(etf_code)
-                            print(f"[etf] synced {etf_code}: rows={written}")
+                            failures.append(
+                                {
+                                    "code": etf_code,
+                                    "error": reason,
+                                    "type": action,
+                                }
+                            )
+                            print(f"[etf] adj_check {etf_code}: {action}")
                         else:
-                            action = _sync_adj_check_one(
-                                conn,
-                                bs_api,
-                                etf_code,
-                                force=args.force,
-                                epsilon=args.adj_epsilon,
-                                cli_start=args.start,
-                                cli_end=args.end,
-                                summary=summary,
-                            )
-                            if action in {"detect_failed", "needs_full"}:
-                                # needs_full / detect_failed 记入 failures，便于 partial
-                                reason = (
-                                    "detect_failed"
-                                    if action == "detect_failed"
-                                    else "missing_primary_bars"
-                                )
-                                failures.append(
-                                    {
-                                        "code": etf_code,
-                                        "error": reason,
-                                        "type": action,
-                                    }
-                                )
-                                print(f"[etf] adj_check {etf_code}: {action}")
-                            else:
-                                success_codes.append(etf_code)
-                                print(f"[etf] adj_check {etf_code}: {action}")
-                    except Exception as error:
-                        conn.rollback()
-                        failures.append(_error_summary(etf_code, error))
-                        print(f"[etf] failed {etf_code}: {error}")
-                        print(traceback.format_exc())
+                            success_codes.append(etf_code)
+                            print(f"[etf] adj_check {etf_code}: {action}")
+                except Exception as error:
+                    conn.rollback()
+                    failures.append(_error_summary(etf_code, error))
+                    print(f"[etf] failed {etf_code}: {error}")
+                    print(traceback.format_exc())
 
             finish_meta: dict[str, Any] = {
                 "mode": args.mode,
+                "price_source": "akshare",
                 "pool_size": summary.pool_size,
                 "snapshot_date_min": summary.snapshot_date_min,
                 "snapshot_date_max": summary.snapshot_date_max,
@@ -425,7 +417,6 @@ def run_sync(args: argparse.Namespace) -> int:
         failures.append(_error_summary("*", error))
         print(f"[etf] fatal: {error}")
         print(traceback.format_exc())
-        # 尝试把 fatal 写入已创建的 sync_run
         try:
             if run_id is not None:
                 with connect(settings.database_url) as conn:
@@ -467,7 +458,7 @@ def _parse_date(value: str | None) -> date | None:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Sync ETF daily kline from BaoStock")
+    parser = argparse.ArgumentParser(description="Sync ETF daily kline from AkShare")
     parser.add_argument(
         "--mode",
         choices=("full", "incremental", "adj_check"),
