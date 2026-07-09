@@ -34,6 +34,10 @@ permissions:
 jobs:
   sync-etf:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
+    concurrency:
+      group: sync-etf-kline
+      cancel-in-progress: false
 
     steps:
       - name: Checkout code
@@ -139,6 +143,7 @@ jobs:
           print(f"skipped='{esc(len(d.get('skipped_codes') or []))}'")
           print(f"detect_failed='{esc(','.join(d.get('detect_failed_codes') or []) or '-')}'")
           print(f"needs_full='{esc(','.join(d.get('needs_full_codes') or []) or '-')}'")
+          print(f"adj_gap='{esc(','.join(d.get('adj_gap_codes') or []) or '-')}'")
           PY
           )"
             case "$status" in
@@ -146,7 +151,7 @@ jobs:
               partial) title="ETF日K同步部分成功" ;;
               *) title="ETF日K同步失败" ;;
             esac
-            body="job=sync_etf_kline_baostock mode=${mode} status=${status} success=${success_count} fail=${failure_count} pool=${pool_size} max_date=${max_trade_date} refreshed=${refreshed} skipped=${skipped} detect_failed=${detect_failed} needs_full=${needs_full}
+            body="job=sync_etf_kline_baostock mode=${mode} status=${status} success=${success_count} fail=${failure_count} pool=${pool_size} max_date=${max_trade_date} refreshed=${refreshed} skipped=${skipped} detect_failed=${detect_failed} needs_full=${needs_full} adj_gap=${adj_gap}
           ${RUN_URL}"
           else
             case "$JOB_RESULT" in

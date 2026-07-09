@@ -158,7 +158,7 @@ def get_etf_anchor_qfq(
 
 
 def get_etf_hfq_scale(conn: Connection[dict[str, Any]], etf_code: str) -> float | None:
-    """全历史首日 close/close_qfq，供 incremental 固定后复权锚定。"""
+    """全历史首日 close/close_qfq，供 incremental / adj_check 固定后复权锚定。"""
     with conn.cursor() as cur:
         cur.execute(
             """

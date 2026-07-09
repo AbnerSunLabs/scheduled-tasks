@@ -5,7 +5,8 @@
 - **指数相关表 / 视图**：定义见 `src/scheduled_tasks/models/schema.sql`，**暂不维护**（历史数据保留，本仓库不再写入）。
 - **ETF 相关表**：定义见 `schema.sql`；`etf_daily` 由 `sync_etf_kline_baostock` 主写；`etf_pool_snapshots` 只读；`etf_valuation_snapshots` 非本 job 写入。
 
-所有表均已启用 RLS（Row Level Security）。
+所有表在线上 Supabase 实例中已启用 RLS（Row Level Security）。
+本仓库 `schema.sql` **不包含** `ENABLE ROW LEVEL SECURITY` 语句；新库初始化后需在 Supabase 控制台或额外 SQL 中自行启用 RLS 与策略。
 
 > 已有库若仍为 `etf_grid_*` 旧名，请先执行：
 > `psql "$DATABASE_URL" -f src/scheduled_tasks/models/migrations/20260709_etf_rename_and_adj_columns.sql`

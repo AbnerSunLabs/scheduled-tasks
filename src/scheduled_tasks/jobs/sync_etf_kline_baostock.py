@@ -62,6 +62,8 @@ class SyncSummary:
     detect_failed_codes: list[str] = field(default_factory=list)
     needs_full_codes: list[str] = field(default_factory=list)
     backfill_codes: list[str] = field(default_factory=list)
+    # adj_check 时 Yahoo 多出、库内尚无主 K 的代码（仍刷已有日期复权，不整只失败）
+    adj_gap_codes: list[str] = field(default_factory=list)
     error_summary: list[dict[str, str]] = field(default_factory=list)
     codes: list[str] = field(default_factory=list)
     codes_source: str = "pool"
@@ -81,6 +83,7 @@ class SyncSummary:
             "detect_failed_codes": self.detect_failed_codes,
             "needs_full_codes": self.needs_full_codes,
             "backfill_codes": self.backfill_codes,
+            "adj_gap_codes": self.adj_gap_codes,
             "error_summary": self.error_summary,
             "codes": self.codes,
             "codes_source": self.codes_source,
@@ -223,6 +226,13 @@ def _sync_full_or_incremental_one(
     df = fetch_kline_bundle(etf_code, start, end)
     rows = build_three_adjustments(df, etf_code, hfq_scale=hfq_scale)
 
+    # 有效区间内空结果视为拉取失败，避免写入 0 行却记 success
+    if not rows:
+        raise RuntimeError(
+            f"{etf_code}: empty kline for range {start}→{end} (mode={mode}); "
+            "possible yfinance outage or symbol mismatch"
+        )
+
     if mode == "full":
         span_days = (end - start).days + 1
         if span_days >= 400 and len(rows) < 200:
@@ -288,6 +298,12 @@ def _sync_adj_check_one(
             summary.detect_failed_codes.append(etf_code)
             return _finish_read("detect_failed")
 
+    # 后复权必须用库内全历史首日 scale；CLI --start 截窗时尤其不能用窗口首日重算
+    hfq_scale = get_etf_hfq_scale(conn, etf_code)
+    if hfq_scale is None:
+        summary.needs_full_codes.append(etf_code)
+        return _finish_read("needs_full")
+
     end = cli_end or date.today()
     start = DEFAULT_HISTORY_START
     if cli_start is not None:
@@ -297,16 +313,27 @@ def _sync_adj_check_one(
         return _finish_read("skipped")
 
     df = fetch_kline_bundle(etf_code, start, end)
-    rows = build_adj_only(df, etf_code)
+    rows = build_adj_only(df, etf_code, hfq_scale=hfq_scale)
     if not rows:
-        summary.skipped_codes.append(etf_code)
-        return _finish_read("skipped")
+        raise RuntimeError(
+            f"{etf_code}: empty kline for adj_check range {start}→{end}"
+        )
 
     dates = [r["trade_date"] for r in rows]
     existing = existing_trade_dates(conn, etf_code, dates)
-    if len(existing) < len(dates):
+    if not existing:
         summary.needs_full_codes.append(etf_code)
         return _finish_read("needs_full")
+
+    # Yahoo 多出的交易日只记提示，已有主 K 的日期照常刷复权
+    if len(existing) < len(dates):
+        summary.adj_gap_codes.append(etf_code)
+        print(
+            f"[etf] adj_check {etf_code}: "
+            f"{len(dates) - len(existing)} remote dates missing in etf_daily; "
+            "refresh existing only"
+        )
+        rows = [r for r in rows if r["trade_date"] in existing]
 
     try:
         update_etf_adj_columns(conn, rows)
@@ -408,6 +435,7 @@ def run_sync(args: argparse.Namespace) -> int:
                 "skipped_codes": summary.skipped_codes,
                 "detect_failed_codes": summary.detect_failed_codes,
                 "needs_full_codes": summary.needs_full_codes,
+                "adj_gap_codes": summary.adj_gap_codes,
             }
             if run_id is not None:
                 finish_sync_run(conn, run_id, success_codes, failures, meta=finish_meta)
