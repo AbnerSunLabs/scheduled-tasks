@@ -139,20 +139,34 @@ def _to_float(value: Any) -> float | None:
         return None
 
 
-def build_three_adjustments(df: pd.DataFrame, etf_code: str) -> list[dict[str, Any]]:
+def build_three_adjustments(
+    df: pd.DataFrame,
+    etf_code: str,
+    *,
+    hfq_scale: float | None = None,
+) -> list[dict[str, Any]]:
     """
     从不复权 OHLC + Adj Close 生成三种价。
     qfq = Adj Close（及按因子缩放的 OHLC）；
-    hfq = Adj Close * (C0 / Adj0)，使首日 hfq = 首日不复权价。
+    hfq = Adj Close * scale，使首日 hfq = 首日不复权价。
+
+    hfq_scale：全历史首日 close/adj_close。incremental 必须传入库内锚定，
+    否则会用当前窗口首日重算，导致后复权漂移。
     """
     if df.empty:
         return []
 
-    first = df.iloc[0]
-    c0 = _to_float(first["close"])
-    a0 = _to_float(first["adj_close"])
-    if c0 is None or a0 is None or a0 == 0:
-        raise RuntimeError(f"{etf_code}: invalid first-day close/adj_close for hfq")
+    if hfq_scale is None:
+        first = df.iloc[0]
+        c0 = _to_float(first["close"])
+        a0 = _to_float(first["adj_close"])
+        if c0 is None or a0 is None or a0 == 0:
+            raise RuntimeError(f"{etf_code}: invalid first-day close/adj_close for hfq")
+        scale_hfq = c0 / a0
+    else:
+        if hfq_scale == 0:
+            raise RuntimeError(f"{etf_code}: hfq_scale is zero")
+        scale_hfq = hfq_scale
 
     rows: list[dict[str, Any]] = []
     for _, row in df.iterrows():
@@ -177,8 +191,6 @@ def build_three_adjustments(df: pd.DataFrame, etf_code: str) -> list[dict[str, A
         low_qfq = low * factor
         close_qfq = adj
 
-        # 后复权：hfq = adj * (C0/A0) = close * factor * C0/A0
-        scale_hfq = c0 / a0
         open_hfq = open_qfq * scale_hfq
         high_hfq = high_qfq * scale_hfq
         low_hfq = low_qfq * scale_hfq
@@ -213,9 +225,14 @@ def build_three_adjustments(df: pd.DataFrame, etf_code: str) -> list[dict[str, A
     return rows
 
 
-def build_adj_only(df: pd.DataFrame, etf_code: str) -> list[dict[str, Any]]:
+def build_adj_only(
+    df: pd.DataFrame,
+    etf_code: str,
+    *,
+    hfq_scale: float | None = None,
+) -> list[dict[str, Any]]:
     """仅复权列（adj_check）；逻辑同 build_three_adjustments。"""
-    full = build_three_adjustments(df, etf_code)
+    full = build_three_adjustments(df, etf_code, hfq_scale=hfq_scale)
     return [
         {
             "etf_code": r["etf_code"],

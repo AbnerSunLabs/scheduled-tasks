@@ -24,6 +24,7 @@ from scheduled_tasks.db import (
     fetch_etf_pool,
     finish_sync_run,
     get_etf_anchor_qfq,
+    get_etf_hfq_scale,
     get_etf_max_trade_date,
     update_etf_adj_columns,
     upsert_etf_daily_bars,
@@ -209,9 +210,18 @@ def _sync_full_or_incremental_one(
         print(f"[etf] {etf_code}: start {start} > end {end}, skip")
         return 0
 
+    # incremental 近窗必须用库内全历史首日锚定，避免 hfq 随窗口漂移
+    hfq_scale: float | None = None
+    if mode == "incremental" and last_date is not None:
+        hfq_scale = get_etf_hfq_scale(conn, etf_code)
+        if hfq_scale is None:
+            raise RuntimeError(
+                f"{etf_code}: missing first-day close/close_qfq for hfq scale; run full first"
+            )
+
     print(f"[etf] {etf_code}: last={last_date} range={start}→{end} mode={mode}")
     df = fetch_kline_bundle(etf_code, start, end)
-    rows = build_three_adjustments(df, etf_code)
+    rows = build_three_adjustments(df, etf_code, hfq_scale=hfq_scale)
 
     if mode == "full":
         span_days = (end - start).days + 1

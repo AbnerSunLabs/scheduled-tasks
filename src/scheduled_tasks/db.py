@@ -157,6 +157,28 @@ def get_etf_anchor_qfq(
     return row["trade_date"], float(close_qfq) if close_qfq is not None else None
 
 
+def get_etf_hfq_scale(conn: Connection[dict[str, Any]], etf_code: str) -> float | None:
+    """全历史首日 close/close_qfq，供 incremental 固定后复权锚定。"""
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            select close, close_qfq
+            from public.etf_daily
+            where etf_code = %s
+              and close is not null
+              and close_qfq is not null
+              and close_qfq <> 0
+            order by trade_date asc
+            limit 1
+            """,
+            (etf_code,),
+        )
+        row = cur.fetchone()
+    if not row:
+        return None
+    return float(row["close"]) / float(row["close_qfq"])
+
+
 def count_etf_rows(conn: Connection[dict[str, Any]], etf_code: str) -> int:
     with conn.cursor() as cur:
         cur.execute(
@@ -217,7 +239,7 @@ def upsert_etf_daily_bars(
                 low = excluded.low,
                 close = excluded.close,
                 volume = excluded.volume,
-                amount = excluded.amount,
+                amount = coalesce(excluded.amount, etf_daily.amount),
                 open_qfq = coalesce(excluded.open_qfq, etf_daily.open_qfq),
                 high_qfq = coalesce(excluded.high_qfq, etf_daily.high_qfq),
                 low_qfq = coalesce(excluded.low_qfq, etf_daily.low_qfq),

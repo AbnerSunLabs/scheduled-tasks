@@ -58,6 +58,29 @@ def test_build_three_adjustments_qfq_hfq() -> None:
     assert rows[1]["close_hfq"] == pytest.approx(10.0)
 
 
+def test_build_three_adjustments_uses_external_hfq_scale() -> None:
+    """incremental 近窗：必须用全历史 scale，不能用窗口首日。"""
+    # 窗口内无分红，若用窗口首日 scale=1，hfq=adj；正确全历史 scale=10/9
+    df = pd.DataFrame(
+        [
+            {
+                "date": "2024-06-01",
+                "open": 9.0,
+                "high": 9.1,
+                "low": 8.9,
+                "close": 9.0,
+                "adj_close": 9.0,
+                "volume": 1000,
+            }
+        ]
+    )
+    wrong = build_three_adjustments(df, "510300")
+    assert wrong[0]["close_hfq"] == pytest.approx(9.0)
+
+    fixed = build_three_adjustments(df, "510300", hfq_scale=10.0 / 9.0)
+    assert fixed[0]["close_hfq"] == pytest.approx(10.0)
+
+
 def test_build_adj_only_shape() -> None:
     df = pd.DataFrame(
         [
