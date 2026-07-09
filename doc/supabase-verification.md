@@ -6,60 +6,69 @@ Use Supabase Studio as the primary online verification surface.
 
 1. Create a Supabase project.
 2. Open SQL Editor.
-3. Run `src/scheduled_tasks/models/schema.sql`.
-4. Confirm these tables exist:
-   - `indices`
-   - `index_daily_prices`
-   - `index_daily_valuations`
-   - `index_industry_weights`
-   - `sync_runs`
-5. Confirm these views exist:
+3. **新库**：执行 `src/scheduled_tasks/models/schema.sql`。
+4. **已有库（含 `etf_grid_*`）**：执行幂等迁移
+
+```bash
+psql "$DATABASE_URL" -f src/scheduled_tasks/models/migrations/20260709_etf_rename_and_adj_columns.sql
+```
+
+5. Confirm these tables exist:
+   - `indices`（**暂不维护**）
+   - `index_daily_prices`（**暂不维护**）
+   - `index_daily_valuations`（**暂不维护**）
+   - `index_industry_weights`（**暂不维护**）
+   - `sync_runs`（含 `meta jsonb`）
+   - `etf_pool_snapshots`
+   - `etf_daily`（含复权 8 列 + `price_source`）
+   - `etf_valuation_snapshots`（本 job 不写）
+6. Confirm these views exist（随指数基表停更而过期）:
    - `index_latest_snapshot`
    - `index_detail_snapshot`
+7. Confirm 旧表名 `etf_grid_*` **不存在**；主键约束名为 `etf_*_pkey`。
 
 ## GitHub Configuration
 
-Variables:
-
-- `INDEX_CODES`: configured
-
 Required Secrets:
 
-- `DATABASE_URL`: pending until the Supabase project is created
-- `TUSHARE_TOKEN`: configured
-- `DATA_API`: configured
-
-Optional Secrets:
-
-- `DATA_API_SCHEME`
-- `TUSHARE_SYNC_PROXY_ENV`
+- `DATABASE_URL`
+- `BARK_KEY`（未配置时通知 step 跳过）
 
 ## Manual Workflow Check
 
 1. Open GitHub Actions in the `scheduled-tasks` repository.
-2. Run `同步指数数据到 Supabase` manually.
-3. Optionally pass one index code in `index_codes` for a small smoke test.
-4. Confirm the workflow log reports success and row counts.
+2. Run `同步 ETF 日 K 到 Supabase` manually with `mode=full`（首跑）。
+3. Optionally pass `codes` for a small smoke test.
+4. Confirm the workflow log reports success and Bark notification arrives.
 5. Do not copy secret values from logs or local env files into issues or chat.
 
 ## SQL Checks
 
 ```sql
-select id, job_name, status, started_at, finished_at, success_count, failure_count
+select id, job_name, status, started_at, finished_at, success_count, failure_count, meta
 from sync_runs
+where job_name = 'sync_etf_kline_baostock'
 order by started_at desc
 limit 10;
 ```
 
 ```sql
-select index_code, max(trade_date) as latest_trade_date
-from index_daily_prices
-group by index_code
-order by index_code;
+select etf_code, max(trade_date) as latest_trade_date, min(trade_date) as first_trade_date
+from etf_daily
+group by etf_code
+order by etf_code;
 ```
 
 ```sql
-select *
-from index_latest_snapshot
-order by display_order;
+select etf_code, trade_date, close, close_qfq, close_hfq, volume, price_source
+from etf_daily
+where etf_code = '510300'
+order by trade_date desc
+limit 10;
+```
+
+```sql
+select count(*) as pool_size
+from etf_pool_snapshots
+where etf_code not in ('512660', '159992');
 ```

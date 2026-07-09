@@ -54,6 +54,7 @@ create table if not exists index_industry_weights (
 create index if not exists idx_index_industry_weights_as_of_date
   on index_industry_weights (as_of_date desc);
 
+-- index_codes 为历史命名遗留：语义为「本 run 涉及的标的代码」，不限于指数。
 create table if not exists sync_runs (
   id bigserial primary key,
   job_name text not null,
@@ -65,6 +66,7 @@ create table if not exists sync_runs (
   failure_count integer not null default 0,
   success_count integer not null default 0,
   error_summary jsonb not null default '[]'::jsonb,
+  meta jsonb not null default '{}'::jsonb,
   created_at timestamptz not null default now(),
   constraint sync_runs_status check (status in ('running', 'success', 'partial', 'failed'))
 );
@@ -72,6 +74,70 @@ create table if not exists sync_runs (
 create index if not exists idx_sync_runs_started_at
   on sync_runs (started_at desc);
 
+-- ETF 表：索引命名沿用线上 Supabase 默认风格（后缀 _idx），与指数表 idx_ 前缀不同。
+-- 指数相关表/视图暂不维护；本仓库主写 etf_daily，只读 etf_pool_snapshots。
+create table if not exists etf_pool_snapshots (
+  etf_code text primary key,
+  etf_name text not null,
+  category text not null,
+  direction text,
+  source text not null default '预计算',
+  tracking_index_code text,
+  tracking_index_name text,
+  aum_yi numeric,
+  avg_daily_turnover_yi numeric,
+  premium_discount numeric,
+  expense_ratio numeric,
+  snapshot_date date not null,
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists etf_pool_snapshots_snapshot_date_idx
+  on etf_pool_snapshots (snapshot_date desc);
+
+create table if not exists etf_daily (
+  etf_code text not null,
+  trade_date date not null,
+  open numeric,
+  high numeric,
+  low numeric,
+  close numeric not null,
+  volume numeric,
+  amount numeric,
+  nav numeric,
+  premium_rate numeric,
+  fund_size numeric,
+  listing_days integer,
+  updated_at timestamptz not null default now(),
+  bid_price numeric,
+  ask_price numeric,
+  -- 不复权 open/high/low/close；*_qfq 前复权；*_hfq 后复权
+  open_qfq numeric(18, 4),
+  high_qfq numeric(18, 4),
+  low_qfq numeric(18, 4),
+  close_qfq numeric(18, 4),
+  open_hfq numeric(18, 4),
+  high_hfq numeric(18, 4),
+  low_hfq numeric(18, 4),
+  close_hfq numeric(18, 4),
+  -- 仅表示不复权 OHLCV 写入来源；adj_check 不更新本列
+  price_source text,
+  primary key (etf_code, trade_date)
+);
+
+create index if not exists etf_daily_trade_date_idx
+  on etf_daily (trade_date desc);
+
+create table if not exists etf_valuation_snapshots (
+  tracking_index_code text primary key,
+  trade_date date not null,
+  current_pe_ttm numeric,
+  pe_ttm_avg_5y numeric,
+  pe_ttm_avg_10y numeric,
+  updated_at timestamptz not null default now()
+);
+
+-- 以下指数视图依赖基表；指数侧暂不维护，视图随基表停更而过期。
 create or replace view index_latest_snapshot as
 with latest_price as (
   select distinct on (index_code)

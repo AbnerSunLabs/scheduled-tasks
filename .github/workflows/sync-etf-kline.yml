@@ -1,0 +1,182 @@
+name: 同步 ETF 日 K 到 Supabase
+
+on:
+  schedule:
+    # 工作日北京时间约 18:10 / 18:30 / 19:00 → incremental
+    - cron: "10,30 10 * * 1-5"
+    - cron: "0 11 * * 1-5"
+    # 每周日北京时间上午 10:00 → adj_check
+    - cron: "0 2 * * 0"
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "同步模式"
+        required: true
+        type: choice
+        options:
+          - incremental
+          - adj_check
+          - full
+        default: incremental
+      codes:
+        description: "可选：逗号分隔 6 位 ETF 代码（跳过 25 只断言）"
+        required: false
+        type: string
+      force:
+        description: "仅 adj_check：跳过检测强制重刷复权列"
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  sync-etf:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Validate required configuration
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          if [ -z "$DATABASE_URL" ]; then
+            echo "::error::Missing required GitHub Secret: DATABASE_URL"
+            exit 1
+          fi
+
+      - name: Install dependencies
+        run: python -m pip install -e .
+
+      - name: Determine sync mode
+        id: mode
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "mode=${{ inputs.mode }}" >> "$GITHUB_OUTPUT"
+          else
+            # schedule: 周日 cron 为 "0 2 * * 0"；其余工作日为 incremental
+            dow=$(date -u +%u)
+            if [ "$dow" = "7" ]; then
+              echo "mode=adj_check" >> "$GITHUB_OUTPUT"
+            else
+              echo "mode=incremental" >> "$GITHUB_OUTPUT"
+            fi
+          fi
+
+      - name: Sync ETF kline
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          SYNC_MODE: ${{ steps.mode.outputs.mode }}
+          INPUT_CODES: ${{ inputs.codes }}
+          INPUT_FORCE: ${{ inputs.force }}
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          args=(--mode="$SYNC_MODE")
+          if [ -n "${INPUT_CODES:-}" ]; then
+            args+=(--codes="$INPUT_CODES")
+          fi
+          if [ "${INPUT_FORCE:-false}" = "true" ]; then
+            args+=(--force)
+          fi
+          python -m scheduled_tasks.jobs.sync_etf_kline_baostock "${args[@]}"
+
+      - name: Upload summary artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sync-etf-summary
+          path: artifacts/sync_etf_kline_summary.json
+          if-no-files-found: warn
+
+  notify-bark:
+    needs: sync-etf
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download summary artifact
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: sync-etf-summary
+          path: artifacts
+
+      - name: Push Bark notification
+        env:
+          BARK_KEY: ${{ secrets.BARK_KEY }}
+          JOB_RESULT: ${{ needs.sync-etf.result }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          if [ -z "${BARK_KEY:-}" ]; then
+            echo "::warning::BARK_KEY not configured; skip Bark notify"
+            exit 0
+          fi
+
+          summary_file="artifacts/sync_etf_kline_summary.json"
+          if [ -f "$summary_file" ]; then
+            eval "$(python - <<'PY'
+          import json
+          d = json.load(open("artifacts/sync_etf_kline_summary.json", encoding="utf-8"))
+          def esc(v):
+              return str(v).replace("'", "'\\''")
+          print(f"mode='{esc(d.get('mode',''))}'")
+          print(f"status='{esc(d.get('status',''))}'")
+          print(f"success_count='{esc(d.get('success_count',0))}'")
+          print(f"failure_count='{esc(d.get('failure_count',0))}'")
+          print(f"pool_size='{esc(d.get('pool_size',0))}'")
+          print(f"max_trade_date='{esc(d.get('max_trade_date') or '-')}'")
+          print(f"refreshed='{esc(','.join(d.get('refreshed_codes') or []) or '-')}'")
+          print(f"skipped='{esc(len(d.get('skipped_codes') or []))}'")
+          print(f"detect_failed='{esc(','.join(d.get('detect_failed_codes') or []) or '-')}'")
+          print(f"needs_full='{esc(','.join(d.get('needs_full_codes') or []) or '-')}'")
+          PY
+          )"
+            case "$status" in
+              success) title="ETF日K同步成功" ;;
+              partial) title="ETF日K同步部分成功" ;;
+              *) title="ETF日K同步失败" ;;
+            esac
+            body="job=sync_etf_kline_baostock mode=${mode} status=${status} success=${success_count} fail=${failure_count} pool=${pool_size} max_date=${max_trade_date} refreshed=${refreshed} skipped=${skipped} detect_failed=${detect_failed} needs_full=${needs_full}
+          ${RUN_URL}"
+          else
+            case "$JOB_RESULT" in
+              success) title="ETF日K同步成功" ;;
+              cancelled) title="ETF日K同步取消" ;;
+              *) title="ETF日K同步失败" ;;
+            esac
+            body="job=sync_etf_kline_baostock result=${JOB_RESULT} summary missing
+          ${RUN_URL}"
+          fi
+
+          export BARK_TITLE="$title"
+          export BARK_BODY="$body"
+          python - <<'PY'
+          import json
+          import os
+          import urllib.request
+
+          payload = {
+              "device_key": os.environ["BARK_KEY"],
+              "title": os.environ["BARK_TITLE"],
+              "body": os.environ["BARK_BODY"],
+              "group": "scheduled-tasks",
+          }
+          req = urllib.request.Request(
+              "https://api.day.app/push",
+              data=json.dumps(payload).encode("utf-8"),
+              headers={"Content-Type": "application/json"},
+              method="POST",
+          )
+          with urllib.request.urlopen(req, timeout=30) as resp:
+              print(resp.read().decode("utf-8", errors="replace"))
+          PY

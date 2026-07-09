@@ -1,101 +1,112 @@
 # scheduled-tasks
 
-GitHub Actions scheduled jobs for syncing TuShare data into Supabase PostgreSQL.
+GitHub Actions 定时任务：将 BaoStock ETF 日 K 同步到 Supabase PostgreSQL。
 
-This repository is independent from `stock-view`. The first phase only builds the
-database, schema, sync jobs, and verification workflow. It does not change
-`stock-view`.
+本仓库独立于 `stock-view` / `stock-charts`。指数相关表（`indices` 等）**暂不维护**；当前主任务是 ETF 日 K 入库。
 
-## Phase 1 Scope
+## 当前范围
 
-- Sync configured index codes from TuShare into Supabase PostgreSQL.
-- Store index metadata, daily prices, daily valuation points, industry weights,
-  and sync run history.
-- Use `src/scheduled_tasks/data/indices/supported-indices.json` as the default
-  metadata map for index name, category, and display order.
-- Provide SQL views for verification and future `stock-view` integration.
-- Keep `INDEX_CODES` in GitHub Repository Variables as comma-separated values.
+- 从 `etf_pool_snapshots` 读取当前池（排除黑名单后断言 25 只）。
+- 写入 `etf_daily`：不复权 OHLCV + 前/后复权 OHLC + `price_source`。
+- 写入 `sync_runs` 执行记录（`job_name=sync_etf_kline_baostock`）。
+- 模式：`full` / `incremental` / `adj_check`。
+- 成功/失败均通过 Bark 推送（`BARK_KEY`）。
+
+> 说明：`sync_runs.index_codes` 为历史命名遗留，语义为「本 run 涉及的标的代码」，ETF job 也会写入 6 位 ETF 代码。
 
 ## Required GitHub Configuration
 
-Repository Variables:
-
-- `INDEX_CODES`: comma-separated TuShare index codes, for example
-  `000300.SH,000905.SH,399006.SZ`
-
 Repository Secrets:
 
-- `DATABASE_URL`: Supabase PostgreSQL connection string
-- `TUSHARE_TOKEN`: TuShare token
-- `DATA_API`: TuShare API gateway
-
-Optional Repository Secrets:
-
-- `DATA_API_SCHEME`
-- `TUSHARE_SYNC_PROXY_ENV`
+- `DATABASE_URL`：Supabase PostgreSQL 连接串
+- `BARK_KEY`：Bark 推送 key（未配置时跳过通知，不阻断主任务）
 
 Do not print secret values in logs, documents, issue comments, or chat.
 
 ## Supabase Setup
 
-1. Create a Supabase project.
-2. Open Supabase Studio.
-3. Use SQL Editor to run `src/scheduled_tasks/models/schema.sql`.
-4. Copy the standard PostgreSQL connection string into GitHub Secret
-   `DATABASE_URL`.
-5. Configure the TuShare secrets and `INDEX_CODES`.
-6. Run the `同步指数数据到 Supabase` workflow manually.
+1. 新建库：在 SQL Editor 执行 `src/scheduled_tasks/models/schema.sql`。
+2. 已有库（含旧 `etf_grid_*` 表名）：执行幂等迁移
+
+```bash
+psql "$DATABASE_URL" -f src/scheduled_tasks/models/migrations/20260709_etf_rename_and_adj_columns.sql
+```
+
+3. 将 PostgreSQL 连接串写入 GitHub Secret `DATABASE_URL`。
+4. 配置 `BARK_KEY`。
+5. 手动跑一次 `同步 ETF 日 K 到 Supabase`，`mode=full` 补历史。
 
 ## Local Usage
 
-Install dependencies:
+安装依赖：
 
 ```bash
 python -m pip install -e ".[dev]"
 ```
 
-Run the schema against Supabase or a local PostgreSQL database:
+全量同步：
 
 ```bash
-psql "$DATABASE_URL" -f src/scheduled_tasks/models/schema.sql
+python -m scheduled_tasks.jobs.sync_etf_kline_baostock --mode=full
 ```
 
-Run a manual index sync:
+日更（近窗，默认 lookback=5）：
 
 ```bash
-INDEX_CODES="000300.SH,000905.SH" python -m scheduled_tasks.jobs.sync_indices
+python -m scheduled_tasks.jobs.sync_etf_kline_baostock --mode=incremental
 ```
 
-Run tests:
+周日除权检测：
+
+```bash
+python -m scheduled_tasks.jobs.sync_etf_kline_baostock --mode=adj_check
+```
+
+单只/子集（跳过 25 只断言）：
+
+```bash
+python -m scheduled_tasks.jobs.sync_etf_kline_baostock --mode=incremental --codes=510300,159915
+```
+
+运行测试：
 
 ```bash
 pytest
 ```
 
+## Cron
+
+| 时间（北京）                 | 模式          |
+| ---------------------------- | ------------- |
+| 工作日 18:10 / 18:30 / 19:00 | `incremental` |
+| 周日 10:00                   | `adj_check`   |
+
 ## Verification Queries
 
-Recent sync runs:
+最近同步记录：
 
 ```sql
-select id, job_name, status, started_at, finished_at, success_count, failure_count
+select id, job_name, status, started_at, finished_at, success_count, failure_count, meta
 from sync_runs
 order by started_at desc
 limit 10;
 ```
 
-Latest synced market date by index:
+各 ETF 最新交易日：
 
 ```sql
-select index_code, max(trade_date) as latest_trade_date
-from index_daily_prices
-group by index_code
-order by index_code;
+select etf_code, max(trade_date) as latest_trade_date
+from etf_daily
+group by etf_code
+order by etf_code;
 ```
 
-Snapshot view:
+主行情尚未被 BaoStock 覆盖的行：
 
 ```sql
-select *
-from index_latest_snapshot
-order by display_order;
+select etf_code, count(*)
+from etf_daily
+where price_source is distinct from 'baostock'
+group by etf_code
+order by etf_code;
 ```
