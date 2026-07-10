@@ -1,0 +1,54 @@
+name: 应用驾驶舱 Migration
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  apply-migration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install psql
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+
+      - name: Validate DATABASE_URL
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          if [ -z "$DATABASE_URL" ]; then
+            echo "::error::Missing required GitHub Secret: DATABASE_URL"
+            exit 1
+          fi
+
+      - name: Apply cockpit ledger + fx_rates migration
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          set -euo pipefail
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 \
+            -f src/scheduled_tasks/models/migrations/20260710_cockpit_ledger_and_fx_rates.sql
+          echo "migration applied"
+
+      - name: Verify tables exist
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          set -euo pipefail
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c "
+            select tablename
+            from pg_tables
+            where schemaname = 'public'
+              and tablename in (
+                'portfolio_settings', 'target_allocations', 'etf_instruments', 'positions',
+                'trade_records', 'cash_flows', 'cash_accounts', 'rebalance_plans',
+                'grid_plans', 'review_entries', 'decision_logs', 'portfolio_snapshots',
+                'fx_rates'
+              )
+            order by tablename;
+          "

@@ -283,3 +283,38 @@ def update_etf_adj_columns(
             values,
         )
     return len(values)
+
+
+def get_fx_max_rate_date(conn: Connection[dict[str, Any]]) -> date | None:
+    with conn.cursor() as cur:
+        cur.execute("select max(rate_date) as last_date from public.fx_rates")
+        row = cur.fetchone()
+    if not row or row["last_date"] is None:
+        return None
+    return row["last_date"]
+
+
+def upsert_fx_rates(
+    conn: Connection[dict[str, Any]],
+    rows: Iterable[dict[str, Any]],
+) -> int:
+    """按 (rate_date, from_currency, to_currency) upsert 汇率。"""
+    values = list(rows)
+    if not values:
+        return 0
+    with conn.cursor() as cur:
+        cur.executemany(
+            """
+            insert into public.fx_rates (
+              rate_date, from_currency, to_currency, rate, source, updated_at
+            ) values (
+              %(rate_date)s, %(from_currency)s, %(to_currency)s, %(rate)s, %(source)s, now()
+            )
+            on conflict (rate_date, from_currency, to_currency) do update
+            set rate = excluded.rate,
+                source = excluded.source,
+                updated_at = now()
+            """,
+            values,
+        )
+    return len(values)

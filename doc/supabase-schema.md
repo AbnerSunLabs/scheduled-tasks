@@ -4,9 +4,14 @@
 
 - **指数相关表 / 视图**：定义见 `src/scheduled_tasks/models/schema.sql`，**暂不维护**（历史数据保留，本仓库不再写入）。
 - **ETF 相关表**：定义见 `schema.sql`；`etf_daily` 由 `sync_etf_kline_baostock` 主写；`etf_pool_snapshots` 只读；`etf_valuation_snapshots` 非本 job 写入。
+- **汇率**：`fx_rates` 由 `sync_fx_rates_frankfurter` 主写（Frankfurter / ECB）。
+- **驾驶舱用户账本 12 表**：DDL + RLS 见 `migrations/20260710_cockpit_ledger_and_fx_rates.sql`；**业务行由 `stock-charts` UI 写入**，本仓库不写账本数据。
 
-所有表在线上 Supabase 实例中已启用 RLS（Row Level Security）。
-本仓库 `schema.sql` **不包含** `ENABLE ROW LEVEL SECURITY` 语句；新库初始化后需在 Supabase 控制台或额外 SQL 中自行启用 RLS 与策略。
+RLS：
+
+- 账本表：`authenticated` 仅能读写 `user_id = auth.uid()` 的行。
+- 共享表（`fx_rates`、`etf_daily`、`etf_pool_snapshots`、`indices`、`index_daily_prices`）：`authenticated` 只读；job 经 `DATABASE_URL` 写入。
+- `schema.sql` 本身不含完整 RLS；已有库请执行 `20260710_cockpit_ledger_and_fx_rates.sql`。
 
 > 已有库若仍为 `etf_grid_*` 旧名，请先执行：
 > `psql "$DATABASE_URL" -f src/scheduled_tasks/models/migrations/20260709_etf_rename_and_adj_columns.sql`
@@ -23,8 +28,16 @@
 | 表   | `etf_pool_snapshots`      | ETF 当前池（PK=`etf_code`，非历史快照） | **只读**     |
 | 表   | `etf_daily`               | ETF 日行情（OHLCV + 前/后复权 + 来源）  | **主写**     |
 | 表   | `etf_valuation_snapshots` | 跟踪指数估值快照                        | **不写**     |
+| 表   | `fx_rates`                | 日频汇率（USD/CNY/HKD 三角）            | **主写**     |
+| 表   | 账本 12 表                | 见 migration；UI 写入                   | **DDL only** |
 | 视图 | `index_latest_snapshot`   | 指数最新快照                            | **暂不维护** |
 | 视图 | `index_detail_snapshot`   | 指数各维度最新日期                      | **暂不维护** |
+
+### 账本 12 表（DDL only）
+
+`portfolio_settings`、`target_allocations`、`etf_instruments`、`positions`、`trade_records`、`cash_flows`、`cash_accounts`、`rebalance_plans`、`grid_plans`、`review_entries`、`decision_logs`、`portfolio_snapshots`。
+
+领域字段 `FxRate.date` 映射物理列 `fx_rates.rate_date`。
 
 ## 实体关系
 

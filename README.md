@@ -1,21 +1,37 @@
 # scheduled-tasks
 
-GitHub Actions 定时任务：将 **Yahoo Finance（yfinance）** ETF 日 K 同步到 Supabase PostgreSQL。
+GitHub Actions 定时任务：将 **Yahoo Finance（yfinance）** ETF 日 K、以及 **Frankfurter（ECB）** 汇率同步到 Supabase PostgreSQL；并维护 ETF 投资驾驶舱所需的**用户账本 DDL / RLS**（业务数据仍由 `stock-charts` UI 写入）。
 
-> 说明：模块/job 名仍含 `baostock` 为历史命名。GitHub Actions 海外 runner 上 BaoStock
-> 会截断、东财/AkShare 会断连，故实际数据源为 yfinance。
+> 说明：ETF 模块/job 名仍含 `baostock` 为历史命名。GitHub Actions 海外 runner 上 BaoStock
+> 会截断、东财/AkShare 会断连，故实际 ETF 数据源为 yfinance。
 
-本仓库独立于 `stock-view` / `stock-charts`。指数相关表（`indices` 等）**暂不维护**；当前主任务是 ETF 日 K 入库。
+本仓库独立于 `stock-view` / `stock-charts`。指数相关表（`indices` 等）**暂不维护**。
 
 ## 当前范围
 
+### ETF 日 K
+
 - 从 `etf_pool_snapshots` 读取当前池（排除黑名单后断言 25 只）。
 - 写入 `etf_daily`：不复权 OHLCV + 前/后复权 OHLC + `price_source='yfinance'`。
-- 写入 `sync_runs` 执行记录（`job_name=sync_etf_kline_baostock`）。
+- 写入 `sync_runs`（`job_name=sync_etf_kline_baostock`）。
 - 模式：`full` / `incremental` / `adj_check`。
-- 成功/失败均通过 Bark 推送（`BARK_KEY`）。
 
-> 说明：`sync_runs.index_codes` 为历史命名遗留，语义为「本 run 涉及的标的代码」，ETF job 也会写入 6 位 ETF 代码。
+### 汇率
+
+- 数据源：Frankfurter（ECB 日频参考价），无 API Key。
+- 写入 `fx_rates`：`USD→CNY`、`USD→HKD`、`HKD→CNY`（由 USD 锚点推导）。
+- 写入 `sync_runs`（`job_name=sync_fx_rates_frankfurter`）。
+- 模式：`full` / `incremental`。
+
+### 驾驶舱账本 DDL
+
+- Migration：`src/scheduled_tasks/models/migrations/20260710_cockpit_ledger_and_fx_rates.sql`
+- 新建用户账本 12 表 + `fx_rates`，启用 RLS（账本按 `user_id`；共享表 `authenticated` 只读）。
+- **不**在本仓库写入账本业务行；持仓/成交等由 `stock-charts` 经 Supabase Auth（邮箱 Magic Link）+ RLS 写入。
+
+成功/失败均可通过 Bark 推送（`BARK_KEY`）。
+
+> 说明：`sync_runs.index_codes` 为历史命名遗留，语义为「本 run 涉及的标的代码」。
 
 ## Required GitHub Configuration
 
@@ -35,40 +51,40 @@ Do not print secret values in logs, documents, issue comments, or chat.
 psql "$DATABASE_URL" -f src/scheduled_tasks/models/migrations/20260709_etf_rename_and_adj_columns.sql
 ```
 
-3. 将 PostgreSQL 连接串写入 GitHub Secret `DATABASE_URL`。
-4. 配置 `BARK_KEY`。
-5. 手动跑一次 `同步 ETF 日 K 到 Supabase`，`mode=full` 补历史。
+3. 驾驶舱账本 + 汇率表 + RLS（**已有库必跑**）：
+
+```bash
+psql "$DATABASE_URL" -f src/scheduled_tasks/models/migrations/20260710_cockpit_ledger_and_fx_rates.sql
+```
+
+4. 将 PostgreSQL 连接串写入 GitHub Secret `DATABASE_URL`。
+5. 配置 `BARK_KEY`。
+6. 手动跑一次 `同步 ETF 日 K 到 Supabase`，`mode=full` 补历史。
+7. 手动跑一次 `同步汇率到 Supabase`，`mode=full` 补历史汇率。
 
 ## Local Usage
 
 安装依赖：
 
 ```bash
-python -m pip install -e ".[dev]"
+python3 -m pip install -e ".[dev]"
 ```
 
-全量同步：
+### ETF
 
 ```bash
-python -m scheduled_tasks.jobs.sync_etf_kline_baostock --mode=full
+python3 -m scheduled_tasks.jobs.sync_etf_kline_baostock --mode=full
+python3 -m scheduled_tasks.jobs.sync_etf_kline_baostock --mode=incremental
+python3 -m scheduled_tasks.jobs.sync_etf_kline_baostock --mode=adj_check
+python3 -m scheduled_tasks.jobs.sync_etf_kline_baostock --mode=incremental --codes=510300,159915
 ```
 
-日更（近窗，默认 lookback=5）：
+### 汇率
 
 ```bash
-python -m scheduled_tasks.jobs.sync_etf_kline_baostock --mode=incremental
-```
-
-周日除权检测：
-
-```bash
-python -m scheduled_tasks.jobs.sync_etf_kline_baostock --mode=adj_check
-```
-
-单只/子集（跳过 25 只断言）：
-
-```bash
-python -m scheduled_tasks.jobs.sync_etf_kline_baostock --mode=incremental --codes=510300,159915
+python3 -m scheduled_tasks.jobs.sync_fx_rates_frankfurter --mode=full
+python3 -m scheduled_tasks.jobs.sync_fx_rates_frankfurter --mode=incremental
+python3 -m scheduled_tasks.jobs.sync_fx_rates_frankfurter --mode=incremental --lookback-days=14
 ```
 
 运行测试：
@@ -79,10 +95,11 @@ pytest
 
 ## Cron
 
-| 时间（北京）                 | 模式          |
-| ---------------------------- | ------------- |
-| 工作日 18:10 / 18:30 / 19:00 | `incremental` |
-| 周日 10:00                   | `adj_check`   |
+| 任务     | 时间（北京）                 | 模式          |
+| -------- | ---------------------------- | ------------- |
+| ETF 日 K | 工作日 18:10 / 18:30 / 19:00 | `incremental` |
+| ETF 日 K | 周日 10:00                   | `adj_check`   |
+| 汇率     | 工作日 23:30                 | `incremental` |
 
 ## Verification Queries
 
@@ -104,12 +121,26 @@ group by etf_code
 order by etf_code;
 ```
 
-主行情尚未被 BaoStock 覆盖的行：
+汇率最新日：
 
 ```sql
-select etf_code, count(*)
-from etf_daily
-where price_source is distinct from 'yfinance'
-group by etf_code
-order by etf_code;
+select from_currency, to_currency, max(rate_date) as latest_rate_date
+from fx_rates
+group by from_currency, to_currency
+order by 1, 2;
+```
+
+账本表是否存在：
+
+```sql
+select tablename
+from pg_tables
+where schemaname = 'public'
+  and tablename in (
+    'portfolio_settings', 'target_allocations', 'etf_instruments', 'positions',
+    'trade_records', 'cash_flows', 'cash_accounts', 'rebalance_plans',
+    'grid_plans', 'review_entries', 'decision_logs', 'portfolio_snapshots',
+    'fx_rates'
+  )
+order by tablename;
 ```
