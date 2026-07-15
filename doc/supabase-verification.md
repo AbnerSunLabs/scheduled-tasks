@@ -13,19 +13,35 @@ Use Supabase Studio as the primary online verification surface.
 psql "$DATABASE_URL" -f src/scheduled_tasks/models/migrations/20260709_etf_rename_and_adj_columns.sql
 ```
 
-5. Confirm these tables exist:
+5. **已有库且 live 仍为 `etf_pool_snapshots`**：在受控窗口、获得明确授权后**单独**执行 rename（不得与 enrichment migration 或回填同批）：
+
+```bash
+psql "$DATABASE_URL" -f src/scheduled_tasks/models/migrations/20260715_rename_etf_pool_snapshots_to_etf_pool.sql
+```
+
+只读验证（失败则停止后续 enrichment / 国内补数 Task 1–5）：
+
+```sql
+select to_regclass('public.etf_pool'), to_regclass('public.etf_pool_snapshots');
+-- 期望：第一列为 public.etf_pool，第二列为 null
+select count(*) from etf_pool;
+```
+
+GitHub Actions：workflow `应用驾驶舱 Migration`，勾选 `apply_rename_migration` 后手动触发。
+
+6. Confirm these tables exist:
    - `indices`（**暂不维护**）
    - `index_daily_prices`（**暂不维护**）
    - `index_daily_valuations`（**暂不维护**）
    - `index_industry_weights`（**暂不维护**）
    - `sync_runs`（含 `meta jsonb`）
-   - `etf_pool_snapshots`
+   - `etf_pool`
    - `etf_daily`（含复权 8 列 + `price_source`）
    - `etf_valuation_snapshots`（本 job 不写）
-6. Confirm these views exist（随指数基表停更而过期）:
+7. Confirm these views exist（随指数基表停更而过期）:
    - `index_latest_snapshot`
    - `index_detail_snapshot`
-7. Confirm 旧表名 `etf_grid_*` **不存在**；主键约束名为 `etf_*_pkey`。
+8. Confirm 旧表名 `etf_grid_*` 与 `etf_pool_snapshots` **不存在**；主键约束名为 `etf_*_pkey` / `etf_pool_pkey`。
 
 ## GitHub Configuration
 
@@ -80,6 +96,6 @@ from etf_daily;
 
 ```sql
 select count(*) as pool_size
-from etf_pool_snapshots
+from etf_pool
 where etf_code not in ('512660', '159992');
 ```

@@ -3,14 +3,14 @@
 本文档描述当前 Supabase PostgreSQL 实例中的表、视图及关系。
 
 - **指数相关表 / 视图**：定义见 `src/scheduled_tasks/models/schema.sql`，**暂不维护**（历史数据保留，本仓库不再写入）。
-- **ETF 相关表**：定义见 `schema.sql`；`etf_daily` 由 `sync_etf_kline_baostock` 主写；`etf_pool_snapshots` 只读；`etf_valuation_snapshots` 非本 job 写入。
+- **ETF 相关表**：定义见 `schema.sql`；`etf_daily` 由 `sync_etf_kline_baostock` 主写；`etf_pool` 只读；`etf_valuation_snapshots` 非本 job 写入。
 - **汇率**：`fx_rates` 由 `sync_fx_rates_frankfurter` 主写（Frankfurter / ECB）。
 - **驾驶舱用户账本 12 表**：DDL + RLS 见 `migrations/20260710_cockpit_ledger_and_fx_rates.sql`；**业务行由 `stock-charts` UI 写入**，本仓库不写账本数据。
 
 RLS：
 
 - 账本表：`authenticated` 仅能读写 `user_id = auth.uid()` 的行。
-- 共享表（`fx_rates`、`etf_daily`、`etf_pool_snapshots`、`indices`、`index_daily_prices`）：`authenticated` 只读；job 经 `DATABASE_URL` 写入。
+- 共享表（`fx_rates`、`etf_daily`、`etf_pool`、`indices`、`index_daily_prices`）：`authenticated` 只读；job 经 `DATABASE_URL` 写入。
 - `schema.sql` 本身不含完整 RLS；已有库请执行 `20260710_cockpit_ledger_and_fx_rates.sql`。
 
 > 已有库若仍为 `etf_grid_*` 旧名，请先执行：
@@ -25,7 +25,7 @@ RLS：
 | 表   | `index_daily_valuations`  | 指数日估值（PE/PB）                     | **暂不维护** |
 | 表   | `index_industry_weights`  | 指数行业权重（申万分级）                | **暂不维护** |
 | 表   | `sync_runs`               | 同步任务执行记录（含 `meta`）           | **写入**     |
-| 表   | `etf_pool_snapshots`      | ETF 当前池（PK=`etf_code`，非历史快照） | **只读**     |
+| 表   | `etf_pool`                | ETF 当前池（PK=`etf_code`，非历史快照） | **只读**     |
 | 表   | `etf_daily`               | ETF 日行情（OHLCV + 前/后复权 + 来源）  | **主写**     |
 | 表   | `etf_valuation_snapshots` | 跟踪指数估值快照                        | **不写**     |
 | 表   | `fx_rates`                | 日频汇率（USD/CNY/HKD 三角）            | **主写**     |
@@ -47,8 +47,8 @@ erDiagram
     indices ||--o{ index_daily_valuations : "index_code → code"
     indices ||--o{ index_industry_weights : "index_code → code"
     indices ||--o{ etf_valuation_snapshots : "code → tracking_index_code"
-    indices ||--o{ etf_pool_snapshots : "code → tracking_index_code"
-    etf_pool_snapshots ||--o{ etf_daily : "etf_code"
+    indices ||--o{ etf_pool : "code → tracking_index_code"
+    etf_pool ||--o{ etf_daily : "etf_code"
     sync_runs }o--|| etf_daily : "index_codes[] 存 ETF 代码"
 
     sync_runs {
@@ -60,7 +60,7 @@ erDiagram
         jsonb error_summary
     }
 
-    etf_pool_snapshots {
+    etf_pool {
         text etf_code PK
         text etf_name
         date snapshot_date
@@ -105,9 +105,9 @@ erDiagram
 
 ## ETF 表结构详情
 
-### `etf_pool_snapshots` — ETF 当前池
+### `etf_pool` — ETF 当前池主数据
 
-主键仅为 `etf_code` → **当前池**（每标的一行），**不是**按日多版本历史快照。读池必须 **全表直读**，禁止 `where snapshot_date = max(...)`。
+> 原名 `etf_pool_snapshots`（2026-07-15 更名）。主键仅为 `etf_code` → **当前池**（每标的一行），**不是**按日多版本历史快照。读池必须 **全表直读**，禁止 `where snapshot_date = max(...)`。列名 `snapshot_date` 表示「元数据最近刷新日」，非快照版本键。
 
 | 列名                    | 类型          | 约束                         | 说明                                   |
 | ----------------------- | ------------- | ---------------------------- | -------------------------------------- |
@@ -125,7 +125,7 @@ erDiagram
 | `snapshot_date`         | `date`        | NOT NULL                     | 该标的池信息最近刷新日（可跨行不一致） |
 | `updated_at`            | `timestamptz` | NOT NULL, DEFAULT `now()`    | 更新时间                               |
 
-**索引：** `etf_pool_snapshots_snapshot_date_idx`：`(snapshot_date DESC)`
+**索引：** `etf_pool_snapshot_date_idx`：`(snapshot_date DESC)`
 
 ---
 
@@ -168,7 +168,7 @@ erDiagram
 ### ETF 日 K（本仓库）
 
 ```
-etf_pool_snapshots（只读，全表）
+etf_pool（只读，全表）
     │
     ▼
 yfinance（Yahoo；海外 runner 可用）
@@ -208,7 +208,7 @@ limit 10;
 
 ```sql
 select etf_code, etf_name, category, tracking_index_code, aum_yi, snapshot_date
-from etf_pool_snapshots
+from etf_pool
 order by etf_code;
 ```
 

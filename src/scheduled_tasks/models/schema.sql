@@ -75,8 +75,8 @@ create index if not exists idx_sync_runs_started_at
   on sync_runs (started_at desc);
 
 -- ETF 表：索引命名沿用线上 Supabase 默认风格（后缀 _idx），与指数表 idx_ 前缀不同。
--- 指数相关表/视图暂不维护；本仓库主写 etf_daily，只读 etf_pool_snapshots。
-create table if not exists etf_pool_snapshots (
+-- 指数相关表/视图暂不维护；本仓库主写 etf_daily，只读 etf_pool（当前池主数据）。
+create table if not exists etf_pool (
   etf_code text primary key,
   etf_name text not null,
   category text not null,
@@ -92,8 +92,8 @@ create table if not exists etf_pool_snapshots (
   updated_at timestamptz not null default now()
 );
 
-create index if not exists etf_pool_snapshots_snapshot_date_idx
-  on etf_pool_snapshots (snapshot_date desc);
+create index if not exists etf_pool_snapshot_date_idx
+  on etf_pool (snapshot_date desc);
 
 create table if not exists etf_daily (
   etf_code text not null,

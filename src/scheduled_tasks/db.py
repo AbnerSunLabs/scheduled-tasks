@@ -105,12 +105,12 @@ def fetch_etf_pool(
     conn: Connection[dict[str, Any]],
     excluded_codes: Sequence[str],
 ) -> list[dict[str, Any]]:
-    """读取当前 ETF 池全表（禁止按 max(snapshot_date) 过滤）。"""
+    """读取当前 ETF 池全表（禁止按 max(snapshot_date) 过滤）。表名：etf_pool。"""
     with conn.cursor() as cur:
         cur.execute(
             """
             select etf_code, snapshot_date
-            from public.etf_pool_snapshots
+            from public.etf_pool
             where etf_code <> all(%s)
             order by etf_code
             """,
