@@ -22,7 +22,7 @@ require_test_db = pytest.mark.skipif(
 )
 
 MIGRATION_ENRICHMENT = (
-    Path(__file__).resolve().parents[1]
+    Path(__file__).resolve().parents[2]
     / "src/scheduled_tasks/models/migrations"
     / "20260715_etf_daily_amount_enrichment_and_trade_calendar.sql"
 )
