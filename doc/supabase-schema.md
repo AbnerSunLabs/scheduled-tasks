@@ -10,7 +10,7 @@
 RLS：
 
 - 账本表：`authenticated` 仅能读写 `user_id = auth.uid()` 的行。
-- 共享表（`fx_rates`、`etf_daily`、`etf_pool`、`indices`、`index_daily_prices`）：`authenticated` 只读；job 经 `DATABASE_URL` 写入。
+- 共享表（`fx_rates`、`etf_daily`、`etf_pool`、`trade_calendar`、`indices`、`index_daily_prices`）：`authenticated` 只读；job 经 `DATABASE_URL` 写入。
 - `schema.sql` 本身不含完整 RLS；已有库请执行 `20260710_cockpit_ledger_and_fx_rates.sql`。
 
 > 已有库若仍为 `etf_grid_*` 旧名，请先执行：
@@ -29,6 +29,7 @@ RLS：
 | 表   | `etf_daily`               | ETF 日行情（OHLCV + 前/后复权 + 来源）  | **主写**     |
 | 表   | `etf_valuation_snapshots` | 跟踪指数估值快照                        | **不写**     |
 | 表   | `fx_rates`                | 日频汇率（USD/CNY/HKD 三角）            | **主写**     |
+| 表   | `trade_calendar`          | 市场级交易日历（`market='CN'`）         | **主写**（国内） |
 | 表   | 账本 12 表                | 见 migration；UI 写入                   | **DDL only** |
 | 视图 | `index_latest_snapshot`   | 指数最新快照                            | **暂不维护** |
 | 视图 | `index_detail_snapshot`   | 指数各维度最新日期                      | **暂不维护** |
