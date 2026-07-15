@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable, Sequence
+from dataclasses import dataclass, field
 from datetime import UTC, date, datetime
 from typing import Any
 
@@ -10,6 +11,14 @@ import psycopg
 from psycopg import Connection
 from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
+
+
+@dataclass
+class EnrichmentResult:
+    """UPDATE-only 成交额补数结果。"""
+
+    updated_count: int
+    unmatched: list[dict[str, Any]] = field(default_factory=list)
 
 
 def connect(database_url: str) -> Connection[dict[str, Any]]:
@@ -279,6 +288,102 @@ def update_etf_adj_columns(
                 updated_at = now()
             where etf_code = %(etf_code)s
               and trade_date = %(trade_date)s
+            """,
+            values,
+        )
+    return len(values)
+
+
+def _enrichment_row_key(row: dict[str, Any]) -> tuple[str, date]:
+    trade_date = row["trade_date"]
+    if isinstance(trade_date, datetime):
+        trade_date = trade_date.date()
+    elif isinstance(trade_date, str):
+        trade_date = date.fromisoformat(trade_date)
+    return str(row["etf_code"]), trade_date
+
+
+def update_etf_daily_enrichment(
+    conn: Connection[dict[str, Any]],
+    rows: Iterable[dict[str, Any]],
+) -> EnrichmentResult:
+    """仅 UPDATE 已有主行情行的 amount / amount_source / amount_updated_at。
+
+    - 禁止 INSERT / upsert；无匹配行计入 unmatched，不中断批次。
+    - 禁止改 OHLC / volume / 复权列 / price_source / updated_at。
+    - 输入 (etf_code, trade_date) 必须唯一，重复键立即 fail-fast（尚未执行 SQL）。
+    """
+    values = list(rows)
+    if not values:
+        return EnrichmentResult(updated_count=0, unmatched=[])
+
+    input_keys: list[tuple[str, date]] = []
+    seen: set[tuple[str, date]] = set()
+    for row in values:
+        key = _enrichment_row_key(row)
+        if key in seen:
+            raise ValueError(
+                f"duplicate enrichment key before SQL: etf_code={key[0]} trade_date={key[1]}"
+            )
+        seen.add(key)
+        input_keys.append(key)
+        if "amount" not in row or "amount_source" not in row:
+            raise ValueError("enrichment row requires amount and amount_source")
+
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            with incoming as (
+              select *
+              from unnest(
+                %s::text[],
+                %s::date[],
+                %s::numeric[],
+                %s::text[]
+              ) as t(etf_code, trade_date, amount, amount_source)
+            )
+            update public.etf_daily as d
+            set amount = i.amount,
+                amount_source = i.amount_source,
+                amount_updated_at = now()
+            from incoming as i
+            where d.etf_code = i.etf_code
+              and d.trade_date = i.trade_date
+            returning d.etf_code, d.trade_date
+            """,
+            (
+                [k[0] for k in input_keys],
+                [k[1] for k in input_keys],
+                [row["amount"] for row in values],
+                [row["amount_source"] for row in values],
+            ),
+        )
+        returned = {(str(r["etf_code"]), r["trade_date"]) for r in cur.fetchall()}
+
+    unmatched = [
+        {"etf_code": code, "trade_date": trade_date.isoformat()}
+        for code, trade_date in input_keys
+        if (code, trade_date) not in returned
+    ]
+    return EnrichmentResult(updated_count=len(returned), unmatched=unmatched)
+
+
+def upsert_trade_calendar(
+    conn: Connection[dict[str, Any]],
+    rows: Iterable[dict[str, Any]],
+) -> int:
+    """按 (market, cal_date) upsert 交易日历。"""
+    values = list(rows)
+    if not values:
+        return 0
+    with conn.cursor() as cur:
+        cur.executemany(
+            """
+            insert into public.trade_calendar (market, cal_date, is_open, updated_at)
+            values (%(market)s, %(cal_date)s, %(is_open)s, now())
+            on conflict (market, cal_date) do update
+            set is_open = excluded.is_open,
+                updated_at = now()
             """,
             values,
         )

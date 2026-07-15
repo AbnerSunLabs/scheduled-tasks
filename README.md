@@ -73,10 +73,20 @@ select count(*) from public.etf_pool;
 
 GitHub Actions：`应用驾驶舱 Migration` workflow 中勾选 `apply_rename_migration` 后手动触发；未获明确授权勿对 live 执行。
 
-5. 将 PostgreSQL 连接串写入 GitHub Secret `DATABASE_URL`。
-6. 配置 `BARK_KEY`。
-7. 手动跑一次 `同步 ETF 日 K 到 Supabase`，`mode=full` 补历史。
-8. 手动跑一次 `同步汇率到 Supabase`，`mode=full` 补历史汇率。
+5. **成交额补数列 + 交易日历**（须 rename 已验证通过后再跑；单独授权，勿与 rename 同批）：
+
+```bash
+psql "$DATABASE_URL" -f src/scheduled_tasks/models/migrations/20260715_etf_daily_amount_enrichment_and_trade_calendar.sql
+```
+
+只读验证：`etf_daily.amount_source` / `amount_updated_at` 存在，且 `public.trade_calendar` 存在。
+
+国内 Hermes 调度见 `doc/hermes-domestic-cron.md`（Spike 须国内机复跑通过后再启用生产 cron）。
+
+6. 将 PostgreSQL 连接串写入 GitHub Secret `DATABASE_URL`。
+7. 配置 `BARK_KEY`。
+8. 手动跑一次 `同步 ETF 日 K 到 Supabase`，`mode=full` 补历史。
+9. 手动跑一次 `同步汇率到 Supabase`，`mode=full` 补历史汇率。
 
 ## Local Usage
 
