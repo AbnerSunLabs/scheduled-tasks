@@ -88,6 +88,8 @@ cd /opt/scheduled-tasks && /opt/scheduled-tasks/.venv/bin/python -m scheduled_ta
 cd /opt/scheduled-tasks && /opt/scheduled-tasks/.venv/bin/python -m scheduled_tasks.jobs.sync_trade_calendar_baostock --start=2020-01-01 --end=2026-12-31
 ```
 
+任务会校验 BaoStock 是否返回请求区间内逐自然日、无重复的完整日历；空响应、缺日、重复或越界日期均按失败处理并写入 `sync_runs` / summary。
+
 ## 失败通知
 
 - Job 非 0 退出或 `status=failed`：把 stdout / `artifacts/*_summary.json` 推送到 Bark/Telegram。

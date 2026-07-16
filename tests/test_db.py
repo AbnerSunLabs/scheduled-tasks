@@ -87,6 +87,15 @@ def test_conninfo_keeps_at_sign_in_query() -> None:
     assert info["sslmode"] == "require"
 
 
+def test_conninfo_allows_query_without_explicit_dbname() -> None:
+    raw = "postgresql://u:p@localhost:5432?sslmode=require"
+    info = conninfo_from_database_url(raw)
+    assert info["host"] == "localhost"
+    assert info["port"] == 5432
+    assert info["dbname"] == "postgres"
+    assert info["sslmode"] == "require"
+
+
 def test_normalize_database_url_keeps_at_sign_in_query() -> None:
     raw = "postgresql://u:p@localhost:5432/db?application_name=a@b"
     out = normalize_database_url(raw)

@@ -8,7 +8,7 @@ from __future__ import annotations
 import argparse
 import json
 from dataclasses import dataclass, field
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -90,18 +90,43 @@ def cross_check_etf_daily(conn: Any, start: date, end: date) -> dict[str, Any]:
     }
 
 
+def validate_trade_calendar_rows(
+    rows: list[dict[str, Any]], start: date, end: date
+) -> None:
+    """确保 BaoStock 返回请求区间内逐自然日、无重复的完整日历。"""
+    if end < start:
+        raise ValueError("calendar end date must be >= start date")
+
+    expected_dates = {
+        start + timedelta(days=offset) for offset in range((end - start).days + 1)
+    }
+    actual_dates = [row.get("cal_date") for row in rows]
+    actual_date_set = set(actual_dates)
+    if len(actual_dates) != len(actual_date_set):
+        raise ValueError("trade calendar contains duplicate dates")
+    if actual_date_set != expected_dates:
+        missing = len(expected_dates - actual_date_set)
+        extra = len(actual_date_set - expected_dates)
+        raise ValueError(
+            f"trade calendar range incomplete: missing={missing} extra={extra}"
+        )
+
+
 def run(start: date, end: date) -> CalendarSummary:
     settings = load_settings()
     summary = CalendarSummary(start=start.isoformat(), end=end.isoformat())
-    with connect(settings.database_url) as conn:
-        run_id = create_sync_run(
-            conn,
-            JOB_NAME,
-            ("CN",),
-            meta={"start": summary.start, "end": summary.end},
-        )
-        try:
+    run_id: int | None = None
+
+    try:
+        with connect(settings.database_url) as conn:
+            run_id = create_sync_run(
+                conn,
+                JOB_NAME,
+                ("CN",),
+                meta={"start": summary.start, "end": summary.end},
+            )
             rows = fetch_cn_trade_calendar(start, end)
+            validate_trade_calendar_rows(rows, start, end)
             summary.upserted = upsert_trade_calendar(conn, rows)
             summary.open_days = sum(1 for r in rows if r["is_open"])
             summary.closed_days = summary.upserted - summary.open_days
@@ -123,15 +148,26 @@ def run(start: date, end: date) -> CalendarSummary:
                     # 日历本体在 trade_calendar 表，禁止塞进 meta
                 },
             )
-        except Exception as exc:  # noqa: BLE001
-            conn.rollback()
-            summary.status = "failed"
-            summary.error_summary = [
-                {"code": "CN", "error": str(exc), "type": type(exc).__name__}
-            ]
-            finish_sync_run(conn, run_id, [], summary.error_summary)
+    except Exception as exc:  # noqa: BLE001 — 原连接可能失效，须另开连接收口
+        summary.status = "failed"
+        summary.error_summary = [
+            {"code": "CN", "error": str(exc), "type": type(exc).__name__}
+        ]
+        if run_id is not None:
+            try:
+                with connect(settings.database_url) as finish_conn:
+                    finish_sync_run(
+                        finish_conn,
+                        run_id,
+                        [],
+                        summary.error_summary,
+                        meta={"start": summary.start, "end": summary.end},
+                    )
+            except Exception as finish_error:  # noqa: BLE001
+                print(f"[calendar] finish_sync_run after fatal failed: {finish_error}")
+    finally:
+        write_summary(summary)
 
-    write_summary(summary)
     return summary
 
 

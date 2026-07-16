@@ -30,9 +30,9 @@ def _split_authority(url: str) -> tuple[str, str, str, str, str]:
     """拆 DATABASE_URL → (scheme, user, password, hostport, path_and_query)。
 
     不用 urlsplit：密码含 []@/ 等未编码字符时，Python 3.13 会误判 bracketed host。
-    有 query 时：要求 ``@host:port/path?query``，避免 ``application_name=a@b`` 里的
-    ``@`` 被当成 userinfo/host 分界。无 query 时：仍按最后一个 ``@`` 切分，再按
-    host 段第一个 ``/`` 切 path，兼容密码中的 ``/``。
+    有 query 时：按 ``@host:port[/path]?query`` 结构识别 authority，避免
+    ``application_name=a@b`` 里的 ``@`` 被当成 userinfo/host 分界。无 query 时：
+    仍按最后一个 ``@`` 切分，再按 host 段第一个 ``/`` 切 path，兼容密码中的 ``/``。
 
     会 unquote user/password（兼容 Dashboard 百分号编码 URI）；
     若密码本身含字面 %，须写成 %25。
@@ -52,15 +52,15 @@ def _split_authority(url: str) -> tuple[str, str, str, str, str]:
         matched = re.match(
             r"^(?P<userinfo>.+)@"
             r"(?P<hostport>(?:\[[^\]]+\]|[^/?@:]+)(?::\d+)?)"
-            r"(?P<path>/[^?]*)"
+            r"(?P<path>/[^?]*)?"
             r"(?P<query>\?.*)$",
             rest,
         )
         if matched is None:
-            raise ValueError("DATABASE_URL with query must include /dbname before ?")
+            raise ValueError("DATABASE_URL has invalid authority before query")
         userinfo = matched.group("userinfo")
         hostport = matched.group("hostport")
-        path_and_query = matched.group("path") + matched.group("query")
+        path_and_query = (matched.group("path") or "") + matched.group("query")
     else:
         # 密码可能含 @，取最后一个作为 userinfo 与 host 的分界
         userinfo, host_and_path = rest.rsplit("@", 1)
