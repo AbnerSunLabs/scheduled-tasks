@@ -11,7 +11,7 @@ from scheduled_tasks.etf.yfinance_client import (
     build_three_adjustments,
     to_yahoo_symbol,
 )
-from scheduled_tasks.jobs.sync_etf_kline_baostock import (
+from scheduled_tasks.jobs.sync_etf_kline_yfinance import (
     SyncSummary,
     _needs_adj_refresh,
     _sync_adj_check_one,
@@ -132,15 +132,15 @@ def test_needs_adj_refresh_epsilon() -> None:
 def test_incremental_empty_kline_raises(monkeypatch: pytest.MonkeyPatch) -> None:
     """有效区间内空 K 线必须失败，不能记 success。"""
     monkeypatch.setattr(
-        "scheduled_tasks.jobs.sync_etf_kline_baostock.get_etf_max_trade_date",
+        "scheduled_tasks.jobs.sync_etf_kline_yfinance.get_etf_max_trade_date",
         lambda *_a, **_k: date(2024, 6, 1),
     )
     monkeypatch.setattr(
-        "scheduled_tasks.jobs.sync_etf_kline_baostock.get_etf_hfq_scale",
+        "scheduled_tasks.jobs.sync_etf_kline_yfinance.get_etf_hfq_scale",
         lambda *_a, **_k: 10.0 / 9.0,
     )
     monkeypatch.setattr(
-        "scheduled_tasks.jobs.sync_etf_kline_baostock.fetch_kline_bundle",
+        "scheduled_tasks.jobs.sync_etf_kline_yfinance.fetch_kline_bundle",
         lambda *_a, **_k: pd.DataFrame(),
     )
     summary = SyncSummary(mode="incremental")
@@ -187,24 +187,24 @@ def test_adj_check_uses_db_hfq_scale_and_partial_gap(
     updated: list[list[dict]] = []
 
     monkeypatch.setattr(
-        "scheduled_tasks.jobs.sync_etf_kline_baostock.count_etf_rows",
+        "scheduled_tasks.jobs.sync_etf_kline_yfinance.count_etf_rows",
         lambda *_a, **_k: 1,
     )
     monkeypatch.setattr(
-        "scheduled_tasks.jobs.sync_etf_kline_baostock.get_etf_anchor_qfq",
+        "scheduled_tasks.jobs.sync_etf_kline_yfinance.get_etf_anchor_qfq",
         lambda *_a, **_k: (d1, 9.0),
     )
     monkeypatch.setattr(
-        "scheduled_tasks.jobs.sync_etf_kline_baostock.get_etf_hfq_scale",
+        "scheduled_tasks.jobs.sync_etf_kline_yfinance.get_etf_hfq_scale",
         lambda *_a, **_k: 10.0 / 9.0,
     )
     monkeypatch.setattr(
-        "scheduled_tasks.jobs.sync_etf_kline_baostock.fetch_kline_bundle",
+        "scheduled_tasks.jobs.sync_etf_kline_yfinance.fetch_kline_bundle",
         lambda *_a, **_k: df,
     )
     # 库内只有 d1，d2 为缺口
     monkeypatch.setattr(
-        "scheduled_tasks.jobs.sync_etf_kline_baostock.existing_trade_dates",
+        "scheduled_tasks.jobs.sync_etf_kline_yfinance.existing_trade_dates",
         lambda *_a, **_k: {d1},
     )
 
@@ -213,7 +213,7 @@ def test_adj_check_uses_db_hfq_scale_and_partial_gap(
         return len(updated[-1])
 
     monkeypatch.setattr(
-        "scheduled_tasks.jobs.sync_etf_kline_baostock.update_etf_adj_columns",
+        "scheduled_tasks.jobs.sync_etf_kline_yfinance.update_etf_adj_columns",
         _capture_update,
     )
 
@@ -259,23 +259,23 @@ def test_adj_check_cli_start_still_uses_db_scale(
     updated: list[list[dict]] = []
 
     monkeypatch.setattr(
-        "scheduled_tasks.jobs.sync_etf_kline_baostock.count_etf_rows",
+        "scheduled_tasks.jobs.sync_etf_kline_yfinance.count_etf_rows",
         lambda *_a, **_k: 10,
     )
     monkeypatch.setattr(
-        "scheduled_tasks.jobs.sync_etf_kline_baostock.get_etf_anchor_qfq",
+        "scheduled_tasks.jobs.sync_etf_kline_yfinance.get_etf_anchor_qfq",
         lambda *_a, **_k: (date(2024, 1, 2), 9.0),
     )
     monkeypatch.setattr(
-        "scheduled_tasks.jobs.sync_etf_kline_baostock.get_etf_hfq_scale",
+        "scheduled_tasks.jobs.sync_etf_kline_yfinance.get_etf_hfq_scale",
         lambda *_a, **_k: 10.0 / 9.0,
     )
     monkeypatch.setattr(
-        "scheduled_tasks.jobs.sync_etf_kline_baostock.fetch_kline_bundle",
+        "scheduled_tasks.jobs.sync_etf_kline_yfinance.fetch_kline_bundle",
         lambda *_a, **_k: df,
     )
     monkeypatch.setattr(
-        "scheduled_tasks.jobs.sync_etf_kline_baostock.existing_trade_dates",
+        "scheduled_tasks.jobs.sync_etf_kline_yfinance.existing_trade_dates",
         lambda *_a, **_k: {d_window},
     )
 
@@ -284,7 +284,7 @@ def test_adj_check_cli_start_still_uses_db_scale(
         return len(updated[-1])
 
     monkeypatch.setattr(
-        "scheduled_tasks.jobs.sync_etf_kline_baostock.update_etf_adj_columns",
+        "scheduled_tasks.jobs.sync_etf_kline_yfinance.update_etf_adj_columns",
         _capture_update,
     )
 

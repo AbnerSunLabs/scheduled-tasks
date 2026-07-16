@@ -2,15 +2,20 @@
 
 from __future__ import annotations
 
+import re
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime
 from typing import Any
+from urllib.parse import parse_qsl, quote, unquote, urlencode
 
 import psycopg
 from psycopg import Connection
 from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
+
+# Prisma / 部分前端模板会带上；libpq/psycopg 不认
+_UNSUPPORTED_URI_QUERY_KEYS = frozenset({"pgbouncer"})
 
 
 @dataclass
@@ -21,8 +26,142 @@ class EnrichmentResult:
     unmatched: list[dict[str, Any]] = field(default_factory=list)
 
 
+def _split_authority(url: str) -> tuple[str, str, str, str, str]:
+    """拆 DATABASE_URL → (scheme, user, password, hostport, path_and_query)。
+
+    不用 urlsplit：密码含 []@/ 等未编码字符时，Python 3.13 会误判 bracketed host。
+    有 query 时：要求 ``@host:port/path?query``，避免 ``application_name=a@b`` 里的
+    ``@`` 被当成 userinfo/host 分界。无 query 时：仍按最后一个 ``@`` 切分，再按
+    host 段第一个 ``/`` 切 path，兼容密码中的 ``/``。
+
+    会 unquote user/password（兼容 Dashboard 百分号编码 URI）；
+    若密码本身含字面 %，须写成 %25。
+    """
+    raw = url.strip()
+    if "://" not in raw:
+        raise ValueError("DATABASE_URL must be a postgresql:// URI")
+    scheme, rest = raw.split("://", 1)
+    if scheme not in {"postgres", "postgresql"}:
+        raise ValueError(f"unsupported DATABASE_URL scheme: {scheme}")
+
+    if "@" not in rest:
+        raise ValueError("DATABASE_URL missing user@host")
+
+    if "?" in rest:
+        # path 必有，这样 query 内的 @ 不会被 rsplit 误吃
+        matched = re.match(
+            r"^(?P<userinfo>.+)@"
+            r"(?P<hostport>(?:\[[^\]]+\]|[^/?@:]+)(?::\d+)?)"
+            r"(?P<path>/[^?]*)"
+            r"(?P<query>\?.*)$",
+            rest,
+        )
+        if matched is None:
+            raise ValueError("DATABASE_URL with query must include /dbname before ?")
+        userinfo = matched.group("userinfo")
+        hostport = matched.group("hostport")
+        path_and_query = matched.group("path") + matched.group("query")
+    else:
+        # 密码可能含 @，取最后一个作为 userinfo 与 host 的分界
+        userinfo, host_and_path = rest.rsplit("@", 1)
+        path_and_query = ""
+        hostport = host_and_path
+        if "/" in host_and_path:
+            hostport, after = host_and_path.split("/", 1)
+            path_and_query = "/" + after
+
+    if ":" in userinfo:
+        user, password = userinfo.split(":", 1)
+    else:
+        user, password = userinfo, ""
+    # Dashboard 复制的 URI 常对密码做百分号编码；关键字连接必须还原
+    return scheme, unquote(user), unquote(password), hostport, path_and_query
+
+
+def normalize_database_url(database_url: str) -> str:
+    """清洗为可解析的 URI 字符串（日志/工具用）。
+
+    运行时连接请用 ``conninfo_from_database_url`` + ``connect``（关键字参数，
+    密码含特殊字符更稳）。本函数去掉 ``pgbouncer``，并对 user/password 做百分号编码。
+    """
+    scheme, user, password, hostport, path_and_query = _split_authority(database_url)
+    path = path_and_query
+    query = ""
+    if "?" in path_and_query:
+        path, query = path_and_query.split("?", 1)
+        if "#" in query:
+            query = query.split("#", 1)[0]
+
+    filtered = [
+        (k, v)
+        for k, v in parse_qsl(query, keep_blank_values=True)
+        if k.lower() not in _UNSUPPORTED_URI_QUERY_KEYS
+    ]
+    # 密码按 URI 组件编码，避免 []@#? 等破坏解析
+    safe_password = quote(password, safe="")
+    base = f"{scheme}://{quote(user, safe='')}:{safe_password}@{hostport}{path or '/'}"
+    if filtered:
+        return f"{base}?{urlencode(filtered)}"
+    return base
+
+
+def conninfo_from_database_url(database_url: str) -> dict[str, Any]:
+    """解析为 psycopg 关键字参数（密码可含特殊字符，无需事先 URL 编码）。"""
+    _, user, password, hostport, path_and_query = _split_authority(database_url)
+
+    path = path_and_query
+    query = ""
+    if "?" in path_and_query:
+        path, query = path_and_query.split("?", 1)
+        if "#" in query:
+            query = query.split("#", 1)[0]
+    dbname = (path or "/").lstrip("/").split("/", 1)[0] or "postgres"
+
+    # host:port 或 [ipv6]:port
+    if hostport.startswith("["):
+        end = hostport.find("]")
+        if end < 0:
+            raise ValueError("DATABASE_URL has invalid IPv6 host")
+        host = hostport[1:end]
+        port_s = hostport[end + 1 :]
+        port = int(port_s[1:]) if port_s.startswith(":") and port_s[1:] else 5432
+    elif hostport.count(":") == 1:
+        host, port_s = hostport.split(":", 1)
+        port = int(port_s)
+    else:
+        host, port = hostport, 5432
+
+    conninfo: dict[str, Any] = {
+        "host": host,
+        "port": port,
+        "user": user,
+        "password": password,
+        "dbname": dbname,
+    }
+    for key, value in parse_qsl(query, keep_blank_values=True):
+        if key.lower() in _UNSUPPORTED_URI_QUERY_KEYS:
+            continue
+        conninfo[key] = value
+
+    # Supabase 需要 SSL；模板常漏 sslmode
+    if "supabase.com" in host and "sslmode" not in conninfo:
+        conninfo["sslmode"] = "require"
+    return conninfo
+
+
+def _uses_transaction_pooler(conninfo: dict[str, Any], raw_url: str) -> bool:
+    """Supabase 事务池（6543 / pgbouncer）不支持 prepared statements。"""
+    if "pgbouncer" in raw_url.lower():
+        return True
+    return int(conninfo.get("port") or 0) == 6543
+
+
 def connect(database_url: str) -> Connection[dict[str, Any]]:
-    return psycopg.connect(database_url, row_factory=dict_row)
+    conninfo = conninfo_from_database_url(database_url)
+    kwargs: dict[str, Any] = {**conninfo, "row_factory": dict_row}
+    if _uses_transaction_pooler(conninfo, database_url):
+        kwargs["prepare_threshold"] = None
+    return psycopg.connect(**kwargs)
 
 
 def create_sync_run(
@@ -126,6 +265,28 @@ def fetch_etf_pool(
             (list(excluded_codes),),
         )
         return list(cur.fetchall())
+
+
+def fetch_etf_amount_pending_dates(
+    conn: Connection[dict[str, Any]],
+    etf_code: str,
+    start: date,
+    end: date,
+) -> list[date]:
+    """返回区间内已有主行情且 amount 仍为空的交易日（供窗口覆盖核对）。"""
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            select trade_date
+            from public.etf_daily
+            where etf_code = %s
+              and trade_date between %s and %s
+              and amount is null
+            order by trade_date
+            """,
+            (etf_code, start, end),
+        )
+        return [row["trade_date"] for row in cur.fetchall()]
 
 
 def get_etf_max_trade_date(conn: Connection[dict[str, Any]], etf_code: str) -> date | None:

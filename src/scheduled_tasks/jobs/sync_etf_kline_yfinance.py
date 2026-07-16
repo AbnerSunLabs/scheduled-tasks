@@ -1,7 +1,6 @@
 """Sync ETF daily bars from Yahoo Finance into Supabase PostgreSQL.
 
-历史命名保留 sync_etf_kline_baostock。GitHub Actions 海外 runner 上：
-BaoStock 截断、东财/AkShare 断连；实际数据源为 yfinance。
+海外 GitHub Actions runner 上 BaoStock / 东财 AkShare 不可用，故价格主源为 yfinance。
 """
 
 from __future__ import annotations
@@ -37,7 +36,7 @@ from scheduled_tasks.etf.yfinance_client import (
     fetch_kline_bundle,
 )
 
-JOB_NAME = "sync_etf_kline_baostock"
+JOB_NAME = "sync_etf_kline_yfinance"
 EXCLUDED_CODES = frozenset({"512660", "159992"})
 EXPECTED_POOL_SIZE = 25
 ETF_CODE_RE = re.compile(r"^\d{6}$")

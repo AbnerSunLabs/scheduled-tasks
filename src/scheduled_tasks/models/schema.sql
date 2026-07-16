@@ -1,3 +1,5 @@
+-- 表/列中文注释见 migrations/20260716_add_chinese_comments.sql（新建库跑完本文件后执行该 migration）。
+
 create table if not exists indices (
   code text primary key,
   name text not null,

@@ -7,7 +7,7 @@ name: 应用驾驶舱 Migration
 #
 # Live 部署边界：
 #   - 须受控生产窗口 + 明确人工授权后手动触发本 workflow；代码合并 ≠ 已部署。
-#   - rename（步骤 2）不得与 enrichment migration 或数据回填同批执行。
+#   - rename（步骤 2）不得与 enrichment migration 或数据回填同批执行（双勾选由 Guard 步骤硬失败）。
 #   - 步骤 2 验证失败时停止后续 enrichment / 国内补数 Task 1–5。
 
 on:
@@ -34,6 +34,18 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Guard mutually exclusive migration flags
+        env:
+          APPLY_RENAME: ${{ inputs.apply_rename_migration }}
+          APPLY_ENRICHMENT: ${{ inputs.apply_enrichment_migration }}
+        run: |
+          set -euo pipefail
+          # boolean inputs 以字符串 true/false 传入；双 true 违反「不得同批、须单独授权」
+          if [ "$APPLY_RENAME" = "true" ] && [ "$APPLY_ENRICHMENT" = "true" ]; then
+            echo "::error::apply_rename_migration 与 apply_enrichment_migration 互斥，须分两次 workflow run 单独授权，不得同批勾选"
+            exit 1
+          fi
 
       - name: Install psql
         run: sudo apt-get update && sudo apt-get install -y postgresql-client

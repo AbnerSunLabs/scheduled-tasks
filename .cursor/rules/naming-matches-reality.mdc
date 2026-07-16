@@ -1,0 +1,36 @@
+---
+description: 模块/文件/job/文档命名必须与真实职责一致，禁止历史遗留误导名
+alwaysApply: true
+---
+
+# 命名与现状一致
+
+模块路径、文件名、`JOB_NAME`、CLI 入口、文档中的任务名，必须反映**当前真实数据源与职责**，禁止用「历史命名」「兼容旧名」长期掩盖词不达意。
+
+## 要求
+
+1. **名实相符**：做什么就叫什么。yfinance 主写的 job 不得叫 `*baostock*`；真正调 BaoStock 的 client/job 才可含 `baostock`。
+2. **改实现必改名**：更换数据源或职责后，同一任务内完成重命名（文件、模块、`JOB_NAME`、workflow、测试、文档），不得只改实现留旧名。
+3. **文档禁止借口**：不得写「名字仍叫 X，实际是 Y」作为常态说明；应直接使用正确名称。若需兼容旧 `sync_runs.job_name`，单独一句「历史 run 可能仍为旧名」即可。
+4. **测试文件同口径**：测 yfinance 的测试不得叫 `test_*baostock*`。
+5. **中性通用名可保留**：不绑定具体数据源的名字可保留（如 workflow `sync-etf-kline.yml`、artifact `sync_etf_kline_summary.json`）。
+
+## 反例 / 正例
+
+```text
+❌ jobs/sync_etf_kline_baostock.py + PRICE_SOURCE=yfinance
+❌ 文档：「job 名仍为历史命名 sync_etf_kline_baostock」
+✅ jobs/sync_etf_kline_yfinance.py + JOB_NAME=sync_etf_kline_yfinance
+
+❌ tests/test_etf_baostock.py 实际只测 yfinance merge
+✅ tests/test_etf_yfinance.py
+
+✅ etf/baostock_client.py、sync_trade_calendar_baostock（确实调 BaoStock）
+✅ amount_source='baostock'（字段值表示真实来源，不是模块名误导）
+```
+
+## 自检
+
+- [ ] 新读者只看路径/JOB_NAME，能否猜对数据源？
+- [ ] README / `doc/**` 是否还在用「历史命名」解释名实不符？
+- [ ] workflow / `python -m ...` 入口是否与文件名一致？

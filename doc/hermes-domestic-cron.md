@@ -8,14 +8,16 @@
 
 ## 与 GitHub Actions 分工
 
-| 环境 | Job | 职责 |
-| ---- | --- | ---- |
-| GitHub Actions（海外） | `sync_etf_kline_baostock`（实为 yfinance） | 主写 `etf_daily` OHLC/volume/复权/`price_source`/`updated_at`；`amount = coalesce(incoming, existing)` |
-| GitHub Actions（海外） | `sync_fx_rates_frankfurter` | 主写 `fx_rates` |
-| Hermes `no_agent`（国内） | `sync_etf_enrich_akshare` | **UPDATE-only** 补 `amount` / `amount_source` / `amount_updated_at` |
-| Hermes `no_agent`（国内） | `sync_trade_calendar_baostock` | upsert `trade_calendar(market='CN')` |
+| 环境                      | Job                            | 职责                                                                                                   |
+| ------------------------- | ------------------------------ | ------------------------------------------------------------------------------------------------------ |
+| GitHub Actions（海外）    | `sync_etf_kline_yfinance`      | 主写 `etf_daily` OHLC/volume/复权/`price_source`/`updated_at`；`amount = coalesce(incoming, existing)` |
+| GitHub Actions（海外）    | `sync_fx_rates_frankfurter`    | 主写 `fx_rates`                                                                                        |
+| Hermes `no_agent`（国内） | `sync_etf_enrich_akshare`      | **UPDATE-only** 补 `amount` / `amount_source` / `amount_updated_at`                                    |
+| Hermes `no_agent`（国内） | `sync_trade_calendar_baostock` | upsert `trade_calendar(market='CN')`                                                                   |
 
-补数 job 与 yfinance 时间重叠可接受；最终业务字段态由双 writer 语义保证（价格权威 = yfinance，成交额权威 = AKShare）。
+补数 job 与 yfinance 时间重叠可接受；最终业务字段态由双 writer 语义保证（价格权威 = yfinance，成交额权威 = 国内补数 job）。
+
+成交额拉取顺序：**优先东财/AKShare**；同一 job 内共享东财熔断状态（`AkshareGiveUpState`，跨 ETF）：未 proven 时约 **5 分钟**证明预算；proven 后仅**连续异常窗口**达阈值才 `skip`（合法空响应不计），半开探测（BaoStock 空时单次回试东财）成功可恢复。窗口成功条件：传入库内待补日期时，按**待补覆盖率 ≥ 95%** 判定（全年窗仅 1 行会记 `window_failures`）；未传待补日期时仍为「双源合计至少一行」。东财空 DataFrame / BaoStock 空列表均计入失败路径。job 侧将 `window_failures`、零有效行记入 run failure；**`--mode=full`** 额外把近 250 行 `fill_rate<95%`、无主行情（`missing_ohlcv`）、以及「有拉取行但 `updated_count=0`」记入 failure（incremental 对零更新 / coverage 只观测，避免未建主行情标的长期误失败）。`coverage` 以请求 codes UNNEST 做 LEFT JOIN。`partial`/`failed` → 非零退出。
 
 ## 依赖安装（国内机）
 
@@ -31,12 +33,16 @@ python3.11 -m venv .venv
 
 ## 环境变量
 
-| 变量 | 说明 |
-| ---- | ---- |
-| `DATABASE_URL` | Supabase Postgres 连接串（job owner / service_role 写权限） |
-| `BARK_KEY` / Telegram 等 | 失败通知（可选；stdout 失败需接入现有告警） |
+| 变量                     | 说明                                                                                                                                                                                                                                                                       |
+| ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `DATABASE_URL`           | Supabase Postgres 连接串（job owner / service_role 写权限）。可直接粘贴 Dashboard URI：运行时会剔除 `pgbouncer`、解析特殊字符密码、Supabase 自动 `sslmode=require`、6543 池禁用 prepared statements。也可放仓库根 `.env`（`load_settings()` 自动加载，已有环境变量优先）。 |
+| `BARK_KEY` / Telegram 等 | 失败通知（可选；stdout 失败需接入现有告警）                                                                                                                                                                                                                                |
 
 勿把密钥写入仓库或 cron 明文日志。
+
+## 网络注意（东财）
+
+生产 client 会为东财请求补浏览器 UA，并对 `eastmoney.com` **强制直连**（忽略系统/环境 HTTP 代理）。国内机若依赖代理访问其它站点，不影响本进程其它请求；但东财路径不会走代理。
 
 ## 前置 DDL（Supabase，须授权后执行）
 
@@ -74,6 +80,8 @@ cd /opt/scheduled-tasks && /opt/scheduled-tasks/.venv/bin/python -m scheduled_ta
 cd /opt/scheduled-tasks && /opt/scheduled-tasks/.venv/bin/python -m scheduled_tasks.jobs.sync_etf_enrich_akshare --mode=full
 ```
 
+> `--mode=full`：东财持续不可用时，未 proven 约 5 分钟证明预算后整批切 BaoStock；proven 后连续异常窗达阈值也会 skip。历史窗若覆盖不足 / BaoStock 空结果会记入 `window_failures`，不会 silently 标成功。回填完成度仍以验收 SQL 的 `fill_rate` 与 job 内 `coverage` 门禁为准。
+
 ### 交易日历（每年 1 次 + 手动）
 
 ```bash
@@ -84,6 +92,7 @@ cd /opt/scheduled-tasks && /opt/scheduled-tasks/.venv/bin/python -m scheduled_ta
 
 - Job 非 0 退出或 `status=failed`：把 stdout / `artifacts/*_summary.json` 推送到 Bark/Telegram。
 - `unmatched` 写入 `sync_runs.meta`，待 yfinance 建主行情后再补，不 INSERT 残缺行。
+- `window_failures`（含 `baostock_fallback=empty_result`）写入 `sync_runs.meta`，便于排查历史空洞。
 
 ## 验收 SQL（逐标的最近 250 行）
 
