@@ -1,7 +1,28 @@
 name: 应用驾驶舱 Migration
 
+# 部署顺序（绑定，自上而下）：
+#   1. 20260710_cockpit_ledger_and_fx_rates.sql
+#   2. 20260715_rename_etf_pool_snapshots_to_etf_pool.sql（独立步骤，幂等）
+#   3. 20260715_etf_daily_amount_enrichment_and_trade_calendar.sql（独立步骤；ONLY 在步骤 2 验证通过后启用）
+#
+# Live 部署边界：
+#   - 须受控生产窗口 + 明确人工授权后手动触发本 workflow；代码合并 ≠ 已部署。
+#   - rename（步骤 2）不得与 enrichment migration 或数据回填同批执行（双勾选由 Guard 步骤硬失败）。
+#   - 步骤 2 验证失败时停止后续 enrichment / 国内补数 Task 1–5。
+
 on:
   workflow_dispatch:
+    inputs:
+      apply_rename_migration:
+        description: "执行 etf_pool_snapshots → etf_pool rename（须单独授权；不得与 enrichment migration 同批）"
+        required: true
+        type: boolean
+        default: false
+      apply_enrichment_migration:
+        description: "执行 amount_source/amount_updated_at + trade_calendar（须 rename 已验证；单独授权）"
+        required: true
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -13,6 +34,18 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Guard mutually exclusive migration flags
+        env:
+          APPLY_RENAME: ${{ inputs.apply_rename_migration }}
+          APPLY_ENRICHMENT: ${{ inputs.apply_enrichment_migration }}
+        run: |
+          set -euo pipefail
+          # boolean inputs 以字符串 true/false 传入；双 true 违反「不得同批、须单独授权」
+          if [ "$APPLY_RENAME" = "true" ] && [ "$APPLY_ENRICHMENT" = "true" ]; then
+            echo "::error::apply_rename_migration 与 apply_enrichment_migration 互斥，须分两次 workflow run 单独授权，不得同批勾选"
+            exit 1
+          fi
 
       - name: Install psql
         run: sudo apt-get update && sudo apt-get install -y postgresql-client
@@ -33,9 +66,9 @@ jobs:
           set -euo pipefail
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 \
             -f src/scheduled_tasks/models/migrations/20260710_cockpit_ledger_and_fx_rates.sql
-          echo "migration applied"
+          echo "cockpit ledger + fx_rates migration applied"
 
-      - name: Verify tables exist
+      - name: Verify cockpit ledger tables exist
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: |
@@ -52,3 +85,92 @@ jobs:
               )
             order by tablename;
           "
+
+      - name: Apply etf_pool rename migration
+        if: inputs.apply_rename_migration == true
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          set -euo pipefail
+          echo "Applying etf_pool_snapshots → etf_pool rename (standalone step; do not combine with enrichment migration)"
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 \
+            -f src/scheduled_tasks/models/migrations/20260715_rename_etf_pool_snapshots_to_etf_pool.sql
+          echo "etf_pool rename migration applied"
+
+      - name: Verify etf_pool rename (readonly)
+        if: inputs.apply_rename_migration == true
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          set -euo pipefail
+          result="$(psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -At -c "
+            select coalesce(to_regclass('public.etf_pool')::text, ''),
+                   coalesce(to_regclass('public.etf_pool_snapshots')::text, '');
+          ")"
+          etf_pool="$(echo "$result" | cut -d'|' -f1)"
+          legacy="$(echo "$result" | cut -d'|' -f2)"
+          echo "to_regclass public.etf_pool = ${etf_pool:-<null>}"
+          echo "to_regclass public.etf_pool_snapshots = ${legacy:-<null>}"
+          if [ -z "$etf_pool" ]; then
+            echo "::error::Expected public.etf_pool to exist after rename; got '${etf_pool:-<null>}'"
+            exit 1
+          fi
+          if [ -n "$legacy" ]; then
+            echo "::error::Legacy table public.etf_pool_snapshots still exists; rename incomplete"
+            exit 1
+          fi
+          pool_count="$(psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -At -c "select count(*) from public.etf_pool;")"
+          echo "etf_pool row count (fetch_etf_pool smoke): $pool_count"
+          if [ "$pool_count" -lt 1 ]; then
+            echo "::error::public.etf_pool is empty; fetch_etf_pool would return no pool rows"
+            exit 1
+          fi
+          echo "etf_pool rename verification passed"
+
+      - name: Guard enrichment requires etf_pool
+        if: inputs.apply_enrichment_migration == true
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          set -euo pipefail
+          etf_pool="$(psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -At -c "select coalesce(to_regclass('public.etf_pool')::text, '');")"
+          legacy="$(psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -At -c "select coalesce(to_regclass('public.etf_pool_snapshots')::text, '');")"
+          if [ -z "$etf_pool" ] || [ -n "$legacy" ]; then
+            echo "::error::enrichment migration blocked: rename must be applied and verified first (etf_pool exists, etf_pool_snapshots gone)"
+            exit 1
+          fi
+
+      - name: Apply enrichment + trade_calendar migration
+        if: inputs.apply_enrichment_migration == true
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          set -euo pipefail
+          echo "Applying amount enrichment columns + trade_calendar (standalone; do not combine with rename)"
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 \
+            -f src/scheduled_tasks/models/migrations/20260715_etf_daily_amount_enrichment_and_trade_calendar.sql
+          echo "enrichment migration applied"
+
+      - name: Verify enrichment migration (readonly)
+        if: inputs.apply_enrichment_migration == true
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          set -euo pipefail
+          cols="$(psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -At -c "
+            select string_agg(column_name, ',' order by column_name)
+            from information_schema.columns
+            where table_schema='public' and table_name='etf_daily'
+              and column_name in ('amount_source','amount_updated_at');
+          ")"
+          echo "etf_daily enrichment columns: $cols"
+          if [ "$cols" != "amount_source,amount_updated_at" ]; then
+            echo "::error::expected amount_source,amount_updated_at on etf_daily; got '$cols'"
+            exit 1
+          fi
+          cal="$(psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -At -c "select coalesce(to_regclass('public.trade_calendar')::text, '');")"
+          if [ -z "$cal" ]; then
+            echo "::error::public.trade_calendar missing after enrichment migration"
+            exit 1
+          fi
+          echo "enrichment migration verification passed"

@@ -92,7 +92,7 @@ jobs:
           if [ "${INPUT_FORCE:-false}" = "true" ]; then
             args+=(--force)
           fi
-          python -m scheduled_tasks.jobs.sync_etf_kline_baostock "${args[@]}"
+          python -m scheduled_tasks.jobs.sync_etf_kline_yfinance "${args[@]}"
 
       - name: Upload summary artifact
         if: always()
@@ -151,7 +151,7 @@ jobs:
               partial) title="ETF日K同步部分成功" ;;
               *) title="ETF日K同步失败" ;;
             esac
-            body="job=sync_etf_kline_baostock mode=${mode} status=${status} success=${success_count} fail=${failure_count} pool=${pool_size} max_date=${max_trade_date} refreshed=${refreshed} skipped=${skipped} detect_failed=${detect_failed} needs_full=${needs_full} adj_gap=${adj_gap}
+            body="job=sync_etf_kline_yfinance mode=${mode} status=${status} success=${success_count} fail=${failure_count} pool=${pool_size} max_date=${max_trade_date} refreshed=${refreshed} skipped=${skipped} detect_failed=${detect_failed} needs_full=${needs_full} adj_gap=${adj_gap}
           ${RUN_URL}"
           else
             case "$JOB_RESULT" in
@@ -159,7 +159,7 @@ jobs:
               cancelled) title="ETF日K同步取消" ;;
               *) title="ETF日K同步失败" ;;
             esac
-            body="job=sync_etf_kline_baostock result=${JOB_RESULT} summary missing
+            body="job=sync_etf_kline_yfinance result=${JOB_RESULT} summary missing
           ${RUN_URL}"
           fi
 

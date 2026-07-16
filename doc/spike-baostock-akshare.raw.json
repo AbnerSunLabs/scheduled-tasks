@@ -1,0 +1,1620 @@
+{
+  "generated_at": "2026-07-15T06:40:11.963794+00:00",
+  "today": "2026-07-15",
+  "environment": {
+    "note": "Mac，非国内 Hermes 机器；结果仅供代码就绪与真实网络行为参考，门禁最终以国内机复跑为准。"
+  },
+  "network_mitigations": {
+    "eastmoney_default_ua_blocked": true,
+    "detail": "push2his.eastmoney.com 对 requests 默认 UA (python-requests/x.x) 直接 RST（RemoteDisconnected），与代理设置无关（已禁用系统代理复测）、curl 与自定义 UA 的 requests 均 200；已在进程内为 requests.Session 补统一浏览器 UA。",
+    "ua_patch_applied": true
+  },
+  "pool_sample": [
+    {
+      "code": "510300",
+      "name": "沪深300ETF",
+      "category": "宽基",
+      "exchange": "SSE"
+    },
+    {
+      "code": "159915",
+      "name": "创业板ETF",
+      "category": "宽基",
+      "exchange": "SZSE"
+    },
+    {
+      "code": "512480",
+      "name": "半导体ETF",
+      "category": "行业",
+      "exchange": "SSE"
+    },
+    {
+      "code": "159928",
+      "name": "消费ETF",
+      "category": "行业",
+      "exchange": "SZSE"
+    },
+    {
+      "code": "513100",
+      "name": "纳指ETF",
+      "category": "跨境",
+      "exchange": "SSE"
+    },
+    {
+      "code": "159920",
+      "name": "恒生ETF",
+      "category": "跨境",
+      "exchange": "SZSE"
+    }
+  ],
+  "out_of_pool_probes": [
+    {
+      "code": "511010",
+      "name": "国债ETF（池外探针）",
+      "category": "债券",
+      "exchange": "SSE"
+    },
+    {
+      "code": "518880",
+      "name": "黄金ETF（池外探针）",
+      "category": "商品",
+      "exchange": "SSE"
+    }
+  ],
+  "deep_sample_codes": [
+    "510300",
+    "159915"
+  ],
+  "code_format_mapping_checks": [
+    {
+      "code": "510300",
+      "ak_symbol": "510300",
+      "baostock_code": "sh.510300",
+      "yfinance_symbol": "510300.SS",
+      "round_trip_ok": true
+    },
+    {
+      "code": "159915",
+      "ak_symbol": "159915",
+      "baostock_code": "sz.159915",
+      "yfinance_symbol": "159915.SZ",
+      "round_trip_ok": true
+    },
+    {
+      "code": "512480",
+      "ak_symbol": "512480",
+      "baostock_code": "sh.512480",
+      "yfinance_symbol": "512480.SS",
+      "round_trip_ok": true
+    },
+    {
+      "code": "159928",
+      "ak_symbol": "159928",
+      "baostock_code": "sz.159928",
+      "yfinance_symbol": "159928.SZ",
+      "round_trip_ok": true
+    },
+    {
+      "code": "513100",
+      "ak_symbol": "513100",
+      "baostock_code": "sh.513100",
+      "yfinance_symbol": "513100.SS",
+      "round_trip_ok": true
+    },
+    {
+      "code": "159920",
+      "ak_symbol": "159920",
+      "baostock_code": "sz.159920",
+      "yfinance_symbol": "159920.SZ",
+      "round_trip_ok": true
+    },
+    {
+      "code": "511010",
+      "ak_symbol": "511010",
+      "baostock_code": "sh.511010",
+      "yfinance_symbol": "511010.SS",
+      "round_trip_ok": true
+    },
+    {
+      "code": "518880",
+      "ak_symbol": "518880",
+      "baostock_code": "sh.518880",
+      "yfinance_symbol": "518880.SS",
+      "round_trip_ok": true
+    }
+  ],
+  "akshare_window_requests": [
+    {
+      "code": "510300",
+      "source": "akshare",
+      "window_start": "2025-05-21",
+      "window_end": "2026-05-21",
+      "attempts": [
+        {
+          "attempt": 1,
+          "ok": true,
+          "elapsed_ms": 391.8,
+          "error": null
+        }
+      ],
+      "final_ok": true,
+      "row_count": 243,
+      "error": null
+    },
+    {
+      "code": "510300",
+      "source": "akshare",
+      "window_start": "2026-05-22",
+      "window_end": "2026-07-15",
+      "attempts": [
+        {
+          "attempt": 1,
+          "ok": true,
+          "elapsed_ms": 351.1,
+          "error": null
+        }
+      ],
+      "final_ok": true,
+      "row_count": 38,
+      "error": null
+    },
+    {
+      "code": "159915",
+      "source": "akshare",
+      "window_start": "2025-05-21",
+      "window_end": "2026-05-21",
+      "attempts": [
+        {
+          "attempt": 1,
+          "ok": false,
+          "elapsed_ms": 148.4,
+          "error": "ConnectionError: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))"
+        },
+        {
+          "attempt": 2,
+          "ok": false,
+          "elapsed_ms": 149.0,
+          "error": "ConnectionError: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))"
+        },
+        {
+          "attempt": 3,
+          "ok": false,
+          "elapsed_ms": 135.2,
+          "error": "ConnectionError: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))"
+        },
+        {
+          "attempt": 4,
+          "ok": false,
+          "elapsed_ms": 138.8,
+          "error": "ConnectionError: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))"
+        }
+      ],
+      "final_ok": false,
+      "row_count": 0,
+      "error": "ConnectionError: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))"
+    },
+    {
+      "code": "159915",
+      "source": "akshare",
+      "window_start": "2026-05-22",
+      "window_end": "2026-07-15",
+      "attempts": [
+        {
+          "attempt": 1,
+          "ok": false,
+          "elapsed_ms": 291.3,
+          "error": "ConnectionError: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))"
+        },
+        {
+          "attempt": 2,
+          "ok": false,
+          "elapsed_ms": 143.5,
+          "error": "ConnectionError: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))"
+        },
+        {
+          "attempt": 3,
+          "ok": false,
+          "elapsed_ms": 309.7,
+          "error": "ConnectionError: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))"
+        },
+        {
+          "attempt": 4,
+          "ok": true,
+          "elapsed_ms": 351.6,
+          "error": null
+        }
+      ],
+      "final_ok": true,
+      "row_count": 38,
+      "error": null
+    },
+    {
+      "code": "512480",
+      "source": "akshare",
+      "window_start": "2025-05-21",
+      "window_end": "2026-05-21",
+      "attempts": [
+        {
+          "attempt": 1,
+          "ok": false,
+          "elapsed_ms": 137.9,
+          "error": "ConnectionError: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))"
+        },
+        {
+          "attempt": 2,
+          "ok": false,
+          "elapsed_ms": 150.7,
+          "error": "ConnectionError: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))"
+        },
+        {
+          "attempt": 3,
+          "ok": false,
+          "elapsed_ms": 134.1,
+          "error": "ConnectionError: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))"
+        },
+        {
+          "attempt": 4,
+          "ok": false,
+          "elapsed_ms": 155.1,
+          "error": "ConnectionError: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))"
+        }
+      ],
+      "final_ok": false,
+      "row_count": 0,
+      "error": "ConnectionError: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))"
+    },
+    {
+      "code": "512480",
+      "source": "akshare",
+      "window_start": "2026-05-22",
+      "window_end": "2026-07-15",
+      "attempts": [
+        {
+          "attempt": 1,
+          "ok": false,
+          "elapsed_ms": 130.4,
+          "error": "ConnectionError: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))"
+        },
+        {
+          "attempt": 2,
+          "ok": true,
+          "elapsed_ms": 362.5,
+          "error": null
+        }
+      ],
+      "final_ok": true,
+      "row_count": 38,
+      "error": null
+    },
+    {
+      "code": "159928",
+      "source": "akshare",
+      "window_start": "2025-05-21",
+      "window_end": "2026-05-21",
+      "attempts": [
+        {
+          "attempt": 1,
+          "ok": true,
+          "elapsed_ms": 556.3,
+          "error": null
+        }
+      ],
+      "final_ok": true,
+      "row_count": 243,
+      "error": null
+    },
+    {
+      "code": "159928",
+      "source": "akshare",
+      "window_start": "2026-05-22",
+      "window_end": "2026-07-15",
+      "attempts": [
+        {
+          "attempt": 1,
+          "ok": false,
+          "elapsed_ms": 135.0,
+          "error": "ConnectionError: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))"
+        },
+        {
+          "attempt": 2,
+          "ok": true,
+          "elapsed_ms": 364.7,
+          "error": null
+        }
+      ],
+      "final_ok": true,
+      "row_count": 38,
+      "error": null
+    },
+    {
+      "code": "513100",
+      "source": "akshare",
+      "window_start": "2025-05-21",
+      "window_end": "2026-05-21",
+      "attempts": [
+        {
+          "attempt": 1,
+          "ok": true,
+          "elapsed_ms": 388.7,
+          "error": null
+        }
+      ],
+      "final_ok": true,
+      "row_count": 243,
+      "error": null
+    },
+    {
+      "code": "513100",
+      "source": "akshare",
+      "window_start": "2026-05-22",
+      "window_end": "2026-07-15",
+      "attempts": [
+        {
+          "attempt": 1,
+          "ok": true,
+          "elapsed_ms": 358.4,
+          "error": null
+        }
+      ],
+      "final_ok": true,
+      "row_count": 38,
+      "error": null
+    },
+    {
+      "code": "159920",
+      "source": "akshare",
+      "window_start": "2025-05-21",
+      "window_end": "2026-05-21",
+      "attempts": [
+        {
+          "attempt": 1,
+          "ok": true,
+          "elapsed_ms": 350.4,
+          "error": null
+        }
+      ],
+      "final_ok": true,
+      "row_count": 243,
+      "error": null
+    },
+    {
+      "code": "159920",
+      "source": "akshare",
+      "window_start": "2026-05-22",
+      "window_end": "2026-07-15",
+      "attempts": [
+        {
+          "attempt": 1,
+          "ok": true,
+          "elapsed_ms": 341.0,
+          "error": null
+        }
+      ],
+      "final_ok": true,
+      "row_count": 38,
+      "error": null
+    },
+    {
+      "code": "511010",
+      "source": "akshare",
+      "window_start": "2025-05-21",
+      "window_end": "2026-05-21",
+      "attempts": [
+        {
+          "attempt": 1,
+          "ok": false,
+          "elapsed_ms": 179.6,
+          "error": "ConnectionError: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))"
+        },
+        {
+          "attempt": 2,
+          "ok": false,
+          "elapsed_ms": 143.1,
+          "error": "ConnectionError: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))"
+        },
+        {
+          "attempt": 3,
+          "ok": false,
+          "elapsed_ms": 126.2,
+          "error": "ConnectionError: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))"
+        },
+        {
+          "attempt": 4,
+          "ok": false,
+          "elapsed_ms": 138.5,
+          "error": "ConnectionError: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))"
+        }
+      ],
+      "final_ok": false,
+      "row_count": 0,
+      "error": "ConnectionError: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))"
+    },
+    {
+      "code": "511010",
+      "source": "akshare",
+      "window_start": "2026-05-22",
+      "window_end": "2026-07-15",
+      "attempts": [
+        {
+          "attempt": 1,
+          "ok": false,
+          "elapsed_ms": 143.5,
+          "error": "ConnectionError: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))"
+        },
+        {
+          "attempt": 2,
+          "ok": true,
+          "elapsed_ms": 350.7,
+          "error": null
+        }
+      ],
+      "final_ok": true,
+      "row_count": 38,
+      "error": null
+    },
+    {
+      "code": "518880",
+      "source": "akshare",
+      "window_start": "2025-05-21",
+      "window_end": "2026-05-21",
+      "attempts": [
+        {
+          "attempt": 1,
+          "ok": true,
+          "elapsed_ms": 351.8,
+          "error": null
+        }
+      ],
+      "final_ok": true,
+      "row_count": 243,
+      "error": null
+    },
+    {
+      "code": "518880",
+      "source": "akshare",
+      "window_start": "2026-05-22",
+      "window_end": "2026-07-15",
+      "attempts": [
+        {
+          "attempt": 1,
+          "ok": true,
+          "elapsed_ms": 351.2,
+          "error": null
+        }
+      ],
+      "final_ok": true,
+      "row_count": 38,
+      "error": null
+    },
+    {
+      "code": "510300",
+      "source": "akshare",
+      "window_start": "2021-06-16",
+      "window_end": "2022-06-16",
+      "attempts": [
+        {
+          "attempt": 1,
+          "ok": true,
+          "elapsed_ms": 350.3,
+          "error": null
+        }
+      ],
+      "final_ok": true,
+      "row_count": 243,
+      "error": null
+    },
+    {
+      "code": "510300",
+      "source": "akshare",
+      "window_start": "2022-06-17",
+      "window_end": "2023-06-17",
+      "attempts": [
+        {
+          "attempt": 1,
+          "ok": true,
+          "elapsed_ms": 325.5,
+          "error": null
+        }
+      ],
+      "final_ok": true,
+      "row_count": 245,
+      "error": null
+    },
+    {
+      "code": "510300",
+      "source": "akshare",
+      "window_start": "2023-06-18",
+      "window_end": "2024-06-17",
+      "attempts": [
+        {
+          "attempt": 1,
+          "ok": true,
+          "elapsed_ms": 344.2,
+          "error": null
+        }
+      ],
+      "final_ok": true,
+      "row_count": 240,
+      "error": null
+    },
+    {
+      "code": "510300",
+      "source": "akshare",
+      "window_start": "2024-06-18",
+      "window_end": "2025-06-18",
+      "attempts": [
+        {
+          "attempt": 1,
+          "ok": false,
+          "elapsed_ms": 251.8,
+          "error": "ConnectionError: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))"
+        },
+        {
+          "attempt": 2,
+          "ok": true,
+          "elapsed_ms": 352.1,
+          "error": null
+        }
+      ],
+      "final_ok": true,
+      "row_count": 243,
+      "error": null
+    },
+    {
+      "code": "510300",
+      "source": "akshare",
+      "window_start": "2025-06-19",
+      "window_end": "2026-06-19",
+      "attempts": [
+        {
+          "attempt": 1,
+          "ok": false,
+          "elapsed_ms": 267.5,
+          "error": "ConnectionError: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))"
+        },
+        {
+          "attempt": 2,
+          "ok": false,
+          "elapsed_ms": 174.9,
+          "error": "ConnectionError: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))"
+        },
+        {
+          "attempt": 3,
+          "ok": false,
+          "elapsed_ms": 145.4,
+          "error": "ConnectionError: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))"
+        },
+        {
+          "attempt": 4,
+          "ok": false,
+          "elapsed_ms": 146.6,
+          "error": "ConnectionError: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))"
+        }
+      ],
+      "final_ok": false,
+      "row_count": 0,
+      "error": "ConnectionError: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))"
+    },
+    {
+      "code": "510300",
+      "source": "akshare",
+      "window_start": "2026-06-20",
+      "window_end": "2026-07-15",
+      "attempts": [
+        {
+          "attempt": 1,
+          "ok": true,
+          "elapsed_ms": 344.1,
+          "error": null
+        }
+      ],
+      "final_ok": true,
+      "row_count": 18,
+      "error": null
+    },
+    {
+      "code": "159915",
+      "source": "akshare",
+      "window_start": "2021-06-16",
+      "window_end": "2022-06-16",
+      "attempts": [
+        {
+          "attempt": 1,
+          "ok": false,
+          "elapsed_ms": 136.1,
+          "error": "ConnectionError: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))"
+        },
+        {
+          "attempt": 2,
+          "ok": false,
+          "elapsed_ms": 153.5,
+          "error": "ConnectionError: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))"
+        },
+        {
+          "attempt": 3,
+          "ok": true,
+          "elapsed_ms": 343.4,
+          "error": null
+        }
+      ],
+      "final_ok": true,
+      "row_count": 243,
+      "error": null
+    },
+    {
+      "code": "159915",
+      "source": "akshare",
+      "window_start": "2022-06-17",
+      "window_end": "2023-06-17",
+      "attempts": [
+        {
+          "attempt": 1,
+          "ok": true,
+          "elapsed_ms": 347.6,
+          "error": null
+        }
+      ],
+      "final_ok": true,
+      "row_count": 245,
+      "error": null
+    },
+    {
+      "code": "159915",
+      "source": "akshare",
+      "window_start": "2023-06-18",
+      "window_end": "2024-06-17",
+      "attempts": [
+        {
+          "attempt": 1,
+          "ok": true,
+          "elapsed_ms": 364.3,
+          "error": null
+        }
+      ],
+      "final_ok": true,
+      "row_count": 240,
+      "error": null
+    },
+    {
+      "code": "159915",
+      "source": "akshare",
+      "window_start": "2024-06-18",
+      "window_end": "2025-06-18",
+      "attempts": [
+        {
+          "attempt": 1,
+          "ok": true,
+          "elapsed_ms": 345.3,
+          "error": null
+        }
+      ],
+      "final_ok": true,
+      "row_count": 243,
+      "error": null
+    },
+    {
+      "code": "159915",
+      "source": "akshare",
+      "window_start": "2025-06-19",
+      "window_end": "2026-06-19",
+      "attempts": [
+        {
+          "attempt": 1,
+          "ok": true,
+          "elapsed_ms": 357.7,
+          "error": null
+        }
+      ],
+      "final_ok": true,
+      "row_count": 243,
+      "error": null
+    },
+    {
+      "code": "159915",
+      "source": "akshare",
+      "window_start": "2026-06-20",
+      "window_end": "2026-07-15",
+      "attempts": [
+        {
+          "attempt": 1,
+          "ok": false,
+          "elapsed_ms": 235.9,
+          "error": "ConnectionError: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))"
+        },
+        {
+          "attempt": 2,
+          "ok": false,
+          "elapsed_ms": 135.0,
+          "error": "ConnectionError: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))"
+        },
+        {
+          "attempt": 3,
+          "ok": false,
+          "elapsed_ms": 145.0,
+          "error": "ConnectionError: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))"
+        },
+        {
+          "attempt": 4,
+          "ok": false,
+          "elapsed_ms": 178.9,
+          "error": "ConnectionError: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))"
+        }
+      ],
+      "final_ok": false,
+      "row_count": 0,
+      "error": "ConnectionError: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))"
+    }
+  ],
+  "baostock_window_requests": [
+    {
+      "code": "510300",
+      "source": "baostock",
+      "window_start": "2025-05-21",
+      "window_end": "2026-05-21",
+      "attempts": [
+        {
+          "attempt": 1,
+          "ok": true,
+          "elapsed_ms": 36.7,
+          "error": null
+        }
+      ],
+      "final_ok": true,
+      "row_count": 89,
+      "error": null
+    },
+    {
+      "code": "510300",
+      "source": "baostock",
+      "window_start": "2026-05-22",
+      "window_end": "2026-07-15",
+      "attempts": [
+        {
+          "attempt": 1,
+          "ok": true,
+          "elapsed_ms": 92.5,
+          "error": null
+        }
+      ],
+      "final_ok": true,
+      "row_count": 37,
+      "error": null
+    },
+    {
+      "code": "159915",
+      "source": "baostock",
+      "window_start": "2025-05-21",
+      "window_end": "2026-05-21",
+      "attempts": [
+        {
+          "attempt": 1,
+          "ok": true,
+          "elapsed_ms": 115.5,
+          "error": null
+        }
+      ],
+      "final_ok": true,
+      "row_count": 89,
+      "error": null
+    },
+    {
+      "code": "159915",
+      "source": "baostock",
+      "window_start": "2026-05-22",
+      "window_end": "2026-07-15",
+      "attempts": [
+        {
+          "attempt": 1,
+          "ok": true,
+          "elapsed_ms": 65.0,
+          "error": null
+        }
+      ],
+      "final_ok": true,
+      "row_count": 37,
+      "error": null
+    },
+    {
+      "code": "512480",
+      "source": "baostock",
+      "window_start": "2025-05-21",
+      "window_end": "2026-05-21",
+      "attempts": [
+        {
+          "attempt": 1,
+          "ok": true,
+          "elapsed_ms": 34.8,
+          "error": null
+        }
+      ],
+      "final_ok": true,
+      "row_count": 89,
+      "error": null
+    },
+    {
+      "code": "512480",
+      "source": "baostock",
+      "window_start": "2026-05-22",
+      "window_end": "2026-07-15",
+      "attempts": [
+        {
+          "attempt": 1,
+          "ok": true,
+          "elapsed_ms": 70.6,
+          "error": null
+        }
+      ],
+      "final_ok": true,
+      "row_count": 37,
+      "error": null
+    },
+    {
+      "code": "159928",
+      "source": "baostock",
+      "window_start": "2025-05-21",
+      "window_end": "2026-05-21",
+      "attempts": [
+        {
+          "attempt": 1,
+          "ok": true,
+          "elapsed_ms": 36.2,
+          "error": null
+        }
+      ],
+      "final_ok": true,
+      "row_count": 89,
+      "error": null
+    },
+    {
+      "code": "159928",
+      "source": "baostock",
+      "window_start": "2026-05-22",
+      "window_end": "2026-07-15",
+      "attempts": [
+        {
+          "attempt": 1,
+          "ok": true,
+          "elapsed_ms": 35.7,
+          "error": null
+        }
+      ],
+      "final_ok": true,
+      "row_count": 37,
+      "error": null
+    },
+    {
+      "code": "513100",
+      "source": "baostock",
+      "window_start": "2025-05-21",
+      "window_end": "2026-05-21",
+      "attempts": [
+        {
+          "attempt": 1,
+          "ok": true,
+          "elapsed_ms": 36.7,
+          "error": null
+        }
+      ],
+      "final_ok": true,
+      "row_count": 89,
+      "error": null
+    },
+    {
+      "code": "513100",
+      "source": "baostock",
+      "window_start": "2026-05-22",
+      "window_end": "2026-07-15",
+      "attempts": [
+        {
+          "attempt": 1,
+          "ok": true,
+          "elapsed_ms": 260.7,
+          "error": null
+        }
+      ],
+      "final_ok": true,
+      "row_count": 37,
+      "error": null
+    },
+    {
+      "code": "159920",
+      "source": "baostock",
+      "window_start": "2025-05-21",
+      "window_end": "2026-05-21",
+      "attempts": [
+        {
+          "attempt": 1,
+          "ok": true,
+          "elapsed_ms": 53.4,
+          "error": null
+        }
+      ],
+      "final_ok": true,
+      "row_count": 89,
+      "error": null
+    },
+    {
+      "code": "159920",
+      "source": "baostock",
+      "window_start": "2026-05-22",
+      "window_end": "2026-07-15",
+      "attempts": [
+        {
+          "attempt": 1,
+          "ok": true,
+          "elapsed_ms": 261.4,
+          "error": null
+        }
+      ],
+      "final_ok": true,
+      "row_count": 37,
+      "error": null
+    },
+    {
+      "code": "511010",
+      "source": "baostock",
+      "window_start": "2025-05-21",
+      "window_end": "2026-05-21",
+      "attempts": [
+        {
+          "attempt": 1,
+          "ok": true,
+          "elapsed_ms": 65.0,
+          "error": null
+        }
+      ],
+      "final_ok": true,
+      "row_count": 89,
+      "error": null
+    },
+    {
+      "code": "511010",
+      "source": "baostock",
+      "window_start": "2026-05-22",
+      "window_end": "2026-07-15",
+      "attempts": [
+        {
+          "attempt": 1,
+          "ok": true,
+          "elapsed_ms": 35.4,
+          "error": null
+        }
+      ],
+      "final_ok": true,
+      "row_count": 37,
+      "error": null
+    },
+    {
+      "code": "518880",
+      "source": "baostock",
+      "window_start": "2025-05-21",
+      "window_end": "2026-05-21",
+      "attempts": [
+        {
+          "attempt": 1,
+          "ok": true,
+          "elapsed_ms": 489.1,
+          "error": null
+        }
+      ],
+      "final_ok": true,
+      "row_count": 89,
+      "error": null
+    },
+    {
+      "code": "518880",
+      "source": "baostock",
+      "window_start": "2026-05-22",
+      "window_end": "2026-07-15",
+      "attempts": [
+        {
+          "attempt": 1,
+          "ok": true,
+          "elapsed_ms": 61.9,
+          "error": null
+        }
+      ],
+      "final_ok": true,
+      "row_count": 37,
+      "error": null
+    }
+  ],
+  "amount_consistency_checks": {
+    "510300": {
+      "sample_size": 989,
+      "checkable_size": 989,
+      "pass_count": 989,
+      "pass_rate": 1.0,
+      "amount_non_null_rate": 1.0,
+      "tolerance": 0.15,
+      "failures": [],
+      "failure_count_total": 0
+    },
+    "159915": {
+      "sample_size": 1214,
+      "checkable_size": 1214,
+      "pass_count": 1214,
+      "pass_rate": 1.0,
+      "amount_non_null_rate": 1.0,
+      "tolerance": 0.15,
+      "failures": [],
+      "failure_count_total": 0
+    },
+    "512480": {
+      "sample_size": 38,
+      "checkable_size": 38,
+      "pass_count": 38,
+      "pass_rate": 1.0,
+      "amount_non_null_rate": 1.0,
+      "tolerance": 0.15,
+      "failures": [],
+      "failure_count_total": 0
+    },
+    "159928": {
+      "sample_size": 281,
+      "checkable_size": 281,
+      "pass_count": 281,
+      "pass_rate": 1.0,
+      "amount_non_null_rate": 1.0,
+      "tolerance": 0.15,
+      "failures": [],
+      "failure_count_total": 0
+    },
+    "513100": {
+      "sample_size": 281,
+      "checkable_size": 281,
+      "pass_count": 281,
+      "pass_rate": 1.0,
+      "amount_non_null_rate": 1.0,
+      "tolerance": 0.15,
+      "failures": [],
+      "failure_count_total": 0
+    },
+    "159920": {
+      "sample_size": 281,
+      "checkable_size": 281,
+      "pass_count": 281,
+      "pass_rate": 1.0,
+      "amount_non_null_rate": 1.0,
+      "tolerance": 0.15,
+      "failures": [],
+      "failure_count_total": 0
+    },
+    "511010": {
+      "sample_size": 38,
+      "checkable_size": 38,
+      "pass_count": 38,
+      "pass_rate": 1.0,
+      "amount_non_null_rate": 1.0,
+      "tolerance": 0.15,
+      "failures": [],
+      "failure_count_total": 0
+    },
+    "518880": {
+      "sample_size": 281,
+      "checkable_size": 281,
+      "pass_count": 281,
+      "pass_rate": 1.0,
+      "amount_non_null_rate": 1.0,
+      "tolerance": 0.15,
+      "failures": [],
+      "failure_count_total": 0
+    }
+  },
+  "cross_source_amount_comparison": {
+    "510300": {
+      "available": true,
+      "sample": [
+        {
+          "trade_date": "2026-07-08",
+          "akshare_amount": 2337287019.0,
+          "baostock_amount": 2337287019.0,
+          "relative_diff": 0.0
+        },
+        {
+          "trade_date": "2026-07-09",
+          "akshare_amount": 4636438104.0,
+          "baostock_amount": 4636438104.0,
+          "relative_diff": 0.0
+        },
+        {
+          "trade_date": "2026-07-10",
+          "akshare_amount": 4039507185.0,
+          "baostock_amount": 4039507185.0,
+          "relative_diff": 0.0
+        },
+        {
+          "trade_date": "2026-07-13",
+          "akshare_amount": 7705111563.0,
+          "baostock_amount": 7705111563.0,
+          "relative_diff": 0.0
+        },
+        {
+          "trade_date": "2026-07-14",
+          "akshare_amount": 8630537927.0,
+          "baostock_amount": 8630537927.0,
+          "relative_diff": 0.0
+        }
+      ]
+    },
+    "159915": {
+      "available": true,
+      "sample": [
+        {
+          "trade_date": "2026-06-12",
+          "akshare_amount": 4861543972.63,
+          "baostock_amount": 4861543972.63,
+          "relative_diff": 0.0
+        },
+        {
+          "trade_date": "2026-06-15",
+          "akshare_amount": 5783322879.484,
+          "baostock_amount": 5783322879.484,
+          "relative_diff": 0.0
+        },
+        {
+          "trade_date": "2026-06-16",
+          "akshare_amount": 4481671129.668,
+          "baostock_amount": 4481671129.668,
+          "relative_diff": 0.0
+        },
+        {
+          "trade_date": "2026-06-17",
+          "akshare_amount": 4511811472.394,
+          "baostock_amount": 4511811472.394,
+          "relative_diff": 0.0
+        },
+        {
+          "trade_date": "2026-06-18",
+          "akshare_amount": 4493982913.518,
+          "baostock_amount": 4493982913.518,
+          "relative_diff": 0.0
+        }
+      ]
+    },
+    "512480": {
+      "available": true,
+      "sample": [
+        {
+          "trade_date": "2026-07-08",
+          "akshare_amount": 1945067169.0,
+          "baostock_amount": 1945067169.0,
+          "relative_diff": 0.0
+        },
+        {
+          "trade_date": "2026-07-09",
+          "akshare_amount": 2594965472.0,
+          "baostock_amount": 2594965472.0,
+          "relative_diff": 0.0
+        },
+        {
+          "trade_date": "2026-07-10",
+          "akshare_amount": 3682685755.0,
+          "baostock_amount": 3682685755.0,
+          "relative_diff": 0.0
+        },
+        {
+          "trade_date": "2026-07-13",
+          "akshare_amount": 2174189014.0,
+          "baostock_amount": 2174189014.0,
+          "relative_diff": 0.0
+        },
+        {
+          "trade_date": "2026-07-14",
+          "akshare_amount": 2216528858.0,
+          "baostock_amount": 2216528858.0,
+          "relative_diff": 0.0
+        }
+      ]
+    },
+    "159928": {
+      "available": true,
+      "sample": [
+        {
+          "trade_date": "2026-07-08",
+          "akshare_amount": 240678474.244,
+          "baostock_amount": 240678474.244,
+          "relative_diff": 0.0
+        },
+        {
+          "trade_date": "2026-07-09",
+          "akshare_amount": 283347154.54,
+          "baostock_amount": 283347154.54,
+          "relative_diff": 0.0
+        },
+        {
+          "trade_date": "2026-07-10",
+          "akshare_amount": 337211379.628,
+          "baostock_amount": 337211379.628,
+          "relative_diff": 0.0
+        },
+        {
+          "trade_date": "2026-07-13",
+          "akshare_amount": 368710951.451,
+          "baostock_amount": 368710951.451,
+          "relative_diff": 0.0
+        },
+        {
+          "trade_date": "2026-07-14",
+          "akshare_amount": 312498560.7,
+          "baostock_amount": 312498560.7,
+          "relative_diff": 0.0
+        }
+      ]
+    },
+    "513100": {
+      "available": true,
+      "sample": [
+        {
+          "trade_date": "2026-07-08",
+          "akshare_amount": 410933339.0,
+          "baostock_amount": 410933339.0,
+          "relative_diff": 0.0
+        },
+        {
+          "trade_date": "2026-07-09",
+          "akshare_amount": 482350560.0,
+          "baostock_amount": 482350560.0,
+          "relative_diff": 0.0
+        },
+        {
+          "trade_date": "2026-07-10",
+          "akshare_amount": 401729423.0,
+          "baostock_amount": 401729423.0,
+          "relative_diff": 0.0
+        },
+        {
+          "trade_date": "2026-07-13",
+          "akshare_amount": 427107233.0,
+          "baostock_amount": 427107233.0,
+          "relative_diff": 0.0
+        },
+        {
+          "trade_date": "2026-07-14",
+          "akshare_amount": 617117479.0,
+          "baostock_amount": 617117479.0,
+          "relative_diff": 0.0
+        }
+      ]
+    },
+    "159920": {
+      "available": true,
+      "sample": [
+        {
+          "trade_date": "2026-07-08",
+          "akshare_amount": 535569050.05,
+          "baostock_amount": 535569050.05,
+          "relative_diff": 0.0
+        },
+        {
+          "trade_date": "2026-07-09",
+          "akshare_amount": 484645877.636,
+          "baostock_amount": 484645877.636,
+          "relative_diff": 0.0
+        },
+        {
+          "trade_date": "2026-07-10",
+          "akshare_amount": 487658560.0,
+          "baostock_amount": 487658560.0,
+          "relative_diff": 0.0
+        },
+        {
+          "trade_date": "2026-07-13",
+          "akshare_amount": 622472005.054,
+          "baostock_amount": 622472005.054,
+          "relative_diff": 0.0
+        },
+        {
+          "trade_date": "2026-07-14",
+          "akshare_amount": 1221481611.086,
+          "baostock_amount": 1221481611.086,
+          "relative_diff": 0.0
+        }
+      ]
+    },
+    "511010": {
+      "available": true,
+      "sample": [
+        {
+          "trade_date": "2026-07-08",
+          "akshare_amount": 4421018063.0,
+          "baostock_amount": 4421018063.0,
+          "relative_diff": 0.0
+        },
+        {
+          "trade_date": "2026-07-09",
+          "akshare_amount": 1355072991.0,
+          "baostock_amount": 1355072991.0,
+          "relative_diff": 0.0
+        },
+        {
+          "trade_date": "2026-07-10",
+          "akshare_amount": 2654021716.0,
+          "baostock_amount": 2654021716.0,
+          "relative_diff": 0.0
+        },
+        {
+          "trade_date": "2026-07-13",
+          "akshare_amount": 1954848112.0,
+          "baostock_amount": 1954848112.0,
+          "relative_diff": 0.0
+        },
+        {
+          "trade_date": "2026-07-14",
+          "akshare_amount": 729828690.0,
+          "baostock_amount": 729828690.0,
+          "relative_diff": 0.0
+        }
+      ]
+    },
+    "518880": {
+      "available": true,
+      "sample": [
+        {
+          "trade_date": "2026-07-08",
+          "akshare_amount": 2068067225.0,
+          "baostock_amount": 2068067225.0,
+          "relative_diff": 0.0
+        },
+        {
+          "trade_date": "2026-07-09",
+          "akshare_amount": 2084790591.0,
+          "baostock_amount": 2084790591.0,
+          "relative_diff": 0.0
+        },
+        {
+          "trade_date": "2026-07-10",
+          "akshare_amount": 1953497774.0,
+          "baostock_amount": 1953497774.0,
+          "relative_diff": 0.0
+        },
+        {
+          "trade_date": "2026-07-13",
+          "akshare_amount": 2551745651.0,
+          "baostock_amount": 2551745651.0,
+          "relative_diff": 0.0
+        },
+        {
+          "trade_date": "2026-07-14",
+          "akshare_amount": 1974213700.0,
+          "baostock_amount": 1974213700.0,
+          "relative_diff": 0.0
+        }
+      ]
+    }
+  },
+  "baostock_trade_dates_check": {
+    "ok": true,
+    "fields": [
+      "calendar_date",
+      "is_trading_day"
+    ],
+    "row_count": 196,
+    "sample": [
+      [
+        "2026-01-01",
+        "0"
+      ],
+      [
+        "2026-01-02",
+        "0"
+      ],
+      [
+        "2026-01-03",
+        "0"
+      ],
+      [
+        "2026-01-04",
+        "0"
+      ],
+      [
+        "2026-01-05",
+        "1"
+      ]
+    ],
+    "matches_expected_schema": true,
+    "mapping_note": "calendar_date -> trade_calendar.trade_date; is_trading_day -> is_open; market='CN' (fixed)"
+  },
+  "baostock_universe_probe": {
+    "ok": true,
+    "check_date": "2026-07-14",
+    "total_securities": 7303,
+    "sample_codes_found": {
+      "510300": true,
+      "159915": true,
+      "512480": true,
+      "159928": true,
+      "513100": true,
+      "159920": true,
+      "511010": true,
+      "518880": true
+    },
+    "any_found": true
+  },
+  "latency_stats": {
+    "akshare": {
+      "windows_total": 28,
+      "windows_ok": 23,
+      "windows_failed_after_retry": 5,
+      "failure_rate_after_retry": 0.1786,
+      "windows_needed_retry": 11,
+      "avg_attempt_latency_ms": 253.9,
+      "p95_attempt_latency_ms": 364.7,
+      "total_attempts": 52
+    },
+    "baostock": {
+      "windows_total": 16,
+      "windows_ok": 16,
+      "windows_failed_after_retry": 0,
+      "failure_rate_after_retry": 0.0,
+      "windows_needed_retry": 0,
+      "avg_attempt_latency_ms": 109.4,
+      "p95_attempt_latency_ms": 261.4,
+      "total_attempts": 16
+    }
+  },
+  "gate_evaluation": {
+    "unit": {
+      "pass_condition": "抽样校验通过率 >= 95%",
+      "observed_min_pass_rate": 1.0,
+      "passed": true
+    },
+    "coverage": {
+      "pass_condition": "池内实际分类全部拉到>=250日且amount非空率>=90%；池外探针单列结果",
+      "pool_detail": {
+        "510300": {
+          "trading_days": 989,
+          "amount_non_null_rate": 1.0,
+          "meets_250d": true,
+          "meets_amount_90pct": true
+        },
+        "159915": {
+          "trading_days": 1214,
+          "amount_non_null_rate": 1.0,
+          "meets_250d": true,
+          "meets_amount_90pct": true
+        },
+        "512480": {
+          "trading_days": 38,
+          "amount_non_null_rate": 1.0,
+          "meets_250d": false,
+          "meets_amount_90pct": true
+        },
+        "159928": {
+          "trading_days": 281,
+          "amount_non_null_rate": 1.0,
+          "meets_250d": true,
+          "meets_amount_90pct": true
+        },
+        "513100": {
+          "trading_days": 281,
+          "amount_non_null_rate": 1.0,
+          "meets_250d": true,
+          "meets_amount_90pct": true
+        },
+        "159920": {
+          "trading_days": 281,
+          "amount_non_null_rate": 1.0,
+          "meets_250d": true,
+          "meets_amount_90pct": true
+        },
+        "511010": {
+          "trading_days": 38,
+          "amount_non_null_rate": 1.0,
+          "meets_250d": false,
+          "meets_amount_90pct": true
+        },
+        "518880": {
+          "trading_days": 281,
+          "amount_non_null_rate": 1.0,
+          "meets_250d": true,
+          "meets_amount_90pct": true
+        }
+      },
+      "passed": false
+    },
+    "depth": {
+      "pass_condition": ">=1只近5年amount非空率>=90%",
+      "detail": {
+        "510300": {
+          "trading_days": 989,
+          "amount_non_null_rate": 1.0,
+          "meets_90pct": true
+        },
+        "159915": {
+          "trading_days": 1214,
+          "amount_non_null_rate": 1.0,
+          "meets_90pct": true
+        }
+      },
+      "passed": true
+    },
+    "stability": {
+      "pass_condition": "AKShare主源窗口级重试后失败率<=10%；BaoStock单列统计不稀释主源分母",
+      "akshare": {
+        "windows_total": 28,
+        "windows_ok": 23,
+        "windows_failed_after_retry": 5,
+        "failure_rate_after_retry": 0.1786,
+        "windows_needed_retry": 11,
+        "avg_attempt_latency_ms": 253.9,
+        "p95_attempt_latency_ms": 364.7,
+        "total_attempts": 52
+      },
+      "baostock_single_column": {
+        "windows_total": 16,
+        "windows_ok": 16,
+        "windows_failed_after_retry": 0,
+        "failure_rate_after_retry": 0.0,
+        "windows_needed_retry": 0,
+        "avg_attempt_latency_ms": 109.4,
+        "p95_attempt_latency_ms": 261.4,
+        "total_attempts": 16
+      },
+      "passed": false
+    },
+    "format": {
+      "pass_condition": "三种代码格式均可映射",
+      "detail": [
+        {
+          "code": "510300",
+          "ak_symbol": "510300",
+          "baostock_code": "sh.510300",
+          "yfinance_symbol": "510300.SS",
+          "round_trip_ok": true
+        },
+        {
+          "code": "159915",
+          "ak_symbol": "159915",
+          "baostock_code": "sz.159915",
+          "yfinance_symbol": "159915.SZ",
+          "round_trip_ok": true
+        },
+        {
+          "code": "512480",
+          "ak_symbol": "512480",
+          "baostock_code": "sh.512480",
+          "yfinance_symbol": "512480.SS",
+          "round_trip_ok": true
+        },
+        {
+          "code": "159928",
+          "ak_symbol": "159928",
+          "baostock_code": "sz.159928",
+          "yfinance_symbol": "159928.SZ",
+          "round_trip_ok": true
+        },
+        {
+          "code": "513100",
+          "ak_symbol": "513100",
+          "baostock_code": "sh.513100",
+          "yfinance_symbol": "513100.SS",
+          "round_trip_ok": true
+        },
+        {
+          "code": "159920",
+          "ak_symbol": "159920",
+          "baostock_code": "sz.159920",
+          "yfinance_symbol": "159920.SZ",
+          "round_trip_ok": true
+        },
+        {
+          "code": "511010",
+          "ak_symbol": "511010",
+          "baostock_code": "sh.511010",
+          "yfinance_symbol": "511010.SS",
+          "round_trip_ok": true
+        },
+        {
+          "code": "518880",
+          "ak_symbol": "518880",
+          "baostock_code": "sh.518880",
+          "yfinance_symbol": "518880.SS",
+          "round_trip_ok": true
+        }
+      ],
+      "passed": true
+    }
+  },
+  "overall_gate_passed": false
+}

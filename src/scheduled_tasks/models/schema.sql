@@ -1,3 +1,5 @@
+-- 表/列中文注释见 migrations/20260716_add_chinese_comments.sql（新建库跑完本文件后执行该 migration）。
+
 create table if not exists indices (
   code text primary key,
   name text not null,
@@ -75,8 +77,8 @@ create index if not exists idx_sync_runs_started_at
   on sync_runs (started_at desc);
 
 -- ETF 表：索引命名沿用线上 Supabase 默认风格（后缀 _idx），与指数表 idx_ 前缀不同。
--- 指数相关表/视图暂不维护；本仓库主写 etf_daily，只读 etf_pool_snapshots。
-create table if not exists etf_pool_snapshots (
+-- 指数相关表/视图暂不维护；本仓库主写 etf_daily，只读 etf_pool（当前池主数据）。
+create table if not exists etf_pool (
   etf_code text primary key,
   etf_name text not null,
   category text not null,
@@ -92,8 +94,8 @@ create table if not exists etf_pool_snapshots (
   updated_at timestamptz not null default now()
 );
 
-create index if not exists etf_pool_snapshots_snapshot_date_idx
-  on etf_pool_snapshots (snapshot_date desc);
+create index if not exists etf_pool_snapshot_date_idx
+  on etf_pool (snapshot_date desc);
 
 create table if not exists etf_daily (
   etf_code text not null,
@@ -122,6 +124,9 @@ create table if not exists etf_daily (
   close_hfq numeric(18, 4),
   -- 仅表示不复权 OHLCV 写入来源；adj_check 不更新本列
   price_source text,
+  -- 成交额来源/新鲜度（国内补数 job 写入；不刷新 updated_at）
+  amount_source text,
+  amount_updated_at timestamptz,
   primary key (etf_code, trade_date)
 );
 
@@ -157,6 +162,18 @@ create table if not exists fx_rates (
 
 create index if not exists fx_rates_rate_date_idx
   on fx_rates (rate_date desc);
+
+-- 全国市场级交易日历（CN）；RLS 见 enrichment migration
+create table if not exists trade_calendar (
+  market text not null,
+  cal_date date not null,
+  is_open boolean not null,
+  updated_at timestamptz not null default now(),
+  primary key (market, cal_date)
+);
+
+create index if not exists trade_calendar_cal_date_idx
+  on trade_calendar (cal_date desc);
 
 -- 用户账本 12 表（依赖 auth.users）不放本文件，见：
 -- models/migrations/20260710_cockpit_ledger_and_fx_rates.sql
