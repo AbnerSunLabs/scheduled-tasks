@@ -66,15 +66,6 @@ jobs:
               exit 1
             fi
           fi
-          if ! [[ "$INPUT_CALENDAR_START" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]]; then
-            echo "::error::calendar_start 须为 YYYY-MM-DD"
-            exit 1
-          fi
-          if ! [[ "$INPUT_CALENDAR_END" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]]; then
-            echo "::error::calendar_end 须为 YYYY-MM-DD"
-            exit 1
-          fi
-
           case "$INPUT_JOB" in
             enrich_incremental)
               if [ -n "${INPUT_CODES:-}" ]; then
@@ -93,6 +84,14 @@ jobs:
               fi
               ;;
             trade_calendar)
+              if ! [[ "$INPUT_CALENDAR_START" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]]; then
+                echo "::error::calendar_start 须为 YYYY-MM-DD"
+                exit 1
+              fi
+              if ! [[ "$INPUT_CALENDAR_END" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]]; then
+                echo "::error::calendar_end 须为 YYYY-MM-DD"
+                exit 1
+              fi
               python -m scheduled_tasks.jobs.sync_trade_calendar_baostock \
                 --start="$INPUT_CALENDAR_START" \
                 --end="$INPUT_CALENDAR_END"
