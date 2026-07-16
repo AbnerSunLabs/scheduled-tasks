@@ -126,6 +126,8 @@ erDiagram
 ### `etf_pool` — ETF 当前池主数据
 
 > 原名 `etf_pool_snapshots`（2026-07-15 更名）。主键仅为 `etf_code` → **当前池**（每标的一行），**不是**按日多版本历史快照。读池必须 **全表直读**，禁止 `where snapshot_date = max(...)`。列名 `snapshot_date` 表示「元数据最近刷新日」，非快照版本键。
+>
+> `tracking_index_code` 回填见 `migrations/20260716_backfill_etf_pool_tracking_index.sql`（job 仍只读本表；元数据补齐用迁移/SQL）。H 开头 CSI 与海外指数可写 `etf_pool`，但受 `indices.code` 格式约束，不能进 `indices` 白名单。
 
 | 列名                    | 类型          | 约束                         | 说明                                   |
 | ----------------------- | ------------- | ---------------------------- | -------------------------------------- |
