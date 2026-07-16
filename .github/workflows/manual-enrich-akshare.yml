@@ -60,14 +60,15 @@ jobs:
           INPUT_CALENDAR_END: ${{ inputs.calendar_end }}
         run: |
           set -euo pipefail
-          if [ -n "${INPUT_CODES:-}" ]; then
-            if ! [[ "$INPUT_CODES" =~ ^[0-9]{6}(,[0-9]{6})*$ ]]; then
+          validate_codes() {
+            if [ -n "${INPUT_CODES:-}" ] && ! [[ "$INPUT_CODES" =~ ^[0-9]{6}(,[0-9]{6})*$ ]]; then
               echo "::error::codes 须为逗号分隔的 6 位数字代码，如 510300,159915"
               exit 1
             fi
-          fi
+          }
           case "$INPUT_JOB" in
             enrich_incremental)
+              validate_codes
               if [ -n "${INPUT_CODES:-}" ]; then
                 python -m scheduled_tasks.jobs.sync_etf_enrich_akshare \
                   --mode=incremental --codes="$INPUT_CODES"
@@ -76,6 +77,7 @@ jobs:
               fi
               ;;
             enrich_full)
+              validate_codes
               if [ -n "${INPUT_CODES:-}" ]; then
                 python -m scheduled_tasks.jobs.sync_etf_enrich_akshare \
                   --mode=full --codes="$INPUT_CODES"
