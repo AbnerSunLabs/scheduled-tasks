@@ -24,22 +24,6 @@ create table if not exists index_daily_prices (
 create index if not exists idx_index_daily_prices_trade_date
   on index_daily_prices (trade_date desc);
 
-create table if not exists index_daily_valuations (
-  index_code text not null references indices(code) on delete cascade,
-  trade_date date not null,
-  pe_ttm numeric(18, 4),
-  pb numeric(18, 4),
-  source text not null default 'index_dailybasic',
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now(),
-  primary key (index_code, trade_date),
-  constraint index_daily_valuations_pe_positive check (pe_ttm is null or pe_ttm > 0),
-  constraint index_daily_valuations_pb_positive check (pb is null or pb > 0)
-);
-
-create index if not exists idx_index_daily_valuations_trade_date
-  on index_daily_valuations (trade_date desc);
-
 create table if not exists index_industry_weights (
   index_code text not null references indices(code) on delete cascade,
   as_of_date date not null,
@@ -77,7 +61,8 @@ create index if not exists idx_sync_runs_started_at
   on sync_runs (started_at desc);
 
 -- ETF 表：索引命名沿用线上 Supabase 默认风格（后缀 _idx），与指数表 idx_ 前缀不同。
--- 指数相关表/视图暂不维护；本仓库主写 etf_daily，只读 etf_pool（当前池主数据）。
+-- 指数相关表/视图：全市场 sync 已停；demo 可用红色火箭对 allowlist 补缺（见 sync_hongsehuojian_fill_validate）。
+-- 本仓库主写 etf_daily，只读 etf_pool（当前池主数据）。
 create table if not exists etf_pool (
   etf_code text primary key,
   etf_name text not null,
@@ -105,7 +90,6 @@ create table if not exists etf_daily (
   low numeric,
   close numeric not null,
   volume numeric,
-  amount numeric,
   nav numeric,
   premium_rate numeric,
   fund_size numeric,
@@ -124,16 +108,13 @@ create table if not exists etf_daily (
   close_hfq numeric(18, 4),
   -- 仅表示不复权 OHLCV 写入来源；adj_check 不更新本列
   price_source text,
-  -- 成交额来源/新鲜度（国内补数 job 写入；不刷新 updated_at）
-  amount_source text,
-  amount_updated_at timestamptz,
   primary key (etf_code, trade_date)
 );
 
 create index if not exists etf_daily_trade_date_idx
   on etf_daily (trade_date desc);
 
-create table if not exists etf_valuation_snapshots (
+create table if not exists etf_valuation (
   tracking_index_code text primary key,
   trade_date date not null,
   current_pe_ttm numeric,
@@ -163,22 +144,10 @@ create table if not exists fx_rates (
 create index if not exists fx_rates_rate_date_idx
   on fx_rates (rate_date desc);
 
--- 全国市场级交易日历（CN）；RLS 见 enrichment migration
-create table if not exists trade_calendar (
-  market text not null,
-  cal_date date not null,
-  is_open boolean not null,
-  updated_at timestamptz not null default now(),
-  primary key (market, cal_date)
-);
-
-create index if not exists trade_calendar_cal_date_idx
-  on trade_calendar (cal_date desc);
-
 -- 用户账本 12 表（依赖 auth.users）不放本文件，见：
 -- models/migrations/20260710_cockpit_ledger_and_fx_rates.sql
 
--- 以下指数视图依赖基表；指数侧暂不维护，视图随基表停更而过期。
+-- 以下指数视图依赖基表；估值改走 etf_valuation（无日估值表）。
 create or replace view index_latest_snapshot as
 with latest_price as (
   select distinct on (index_code)
@@ -194,46 +163,6 @@ history_high as (
     max(close) as history_high
   from index_daily_prices
   group by index_code
-),
-latest_valuation as (
-  select distinct on (index_code)
-    index_code,
-    trade_date,
-    pe_ttm,
-    pb
-  from index_daily_valuations
-  order by index_code, trade_date desc
-),
-valuation_percentiles as (
-  select
-    v.index_code,
-    v.trade_date,
-    case
-      when v.pe_ttm is null then null
-      else round(
-        (
-          count(*) filter (where all_v.pe_ttm is not null and all_v.pe_ttm <= v.pe_ttm)
-          * 1000.0
-          / nullif(count(*) filter (where all_v.pe_ttm is not null), 0)
-        ),
-        1
-      ) / 10.0
-    end as pe_percentile_current,
-    case
-      when v.pb is null then null
-      else round(
-        (
-          count(*) filter (where all_v.pb is not null and all_v.pb <= v.pb)
-          * 1000.0
-          / nullif(count(*) filter (where all_v.pb is not null), 0)
-        ),
-        1
-      ) / 10.0
-    end as pb_percentile_current
-  from latest_valuation v
-  join index_daily_valuations all_v
-    on all_v.index_code = v.index_code
-  group by v.index_code, v.trade_date, v.pe_ttm, v.pb
 )
 select
   i.code,
@@ -247,19 +176,21 @@ select
     when p.close is null or h.history_high is null or h.history_high <= 0 then null
     else round(((p.close / h.history_high - 1) * 100)::numeric, 1)
   end as drawdown_from_high_pct,
-  v.pe_ttm,
-  vp.pe_percentile_current,
+  s.current_pe_ttm as pe_ttm,
+  null::numeric as pe_percentile_current,
   null::numeric as percentile_5y_pe,
   null::numeric as percentile_10y_pe,
-  v.pb,
-  vp.pb_percentile_current,
+  null::numeric as pb,
+  null::numeric as pb_percentile_current,
   null::numeric as pb_percentile_5y,
-  null::numeric as pb_percentile_10y
+  null::numeric as pb_percentile_10y,
+  s.pe_ttm_avg_5y,
+  s.pe_ttm_avg_10y,
+  s.trade_date as valuation_as_of_date
 from indices i
 left join latest_price p on p.index_code = i.code
 left join history_high h on h.index_code = i.code
-left join latest_valuation v on v.index_code = i.code
-left join valuation_percentiles vp on vp.index_code = i.code
+left join etf_valuation s on s.tracking_index_code = i.code
 order by i.display_order;
 
 create or replace view index_detail_snapshot as
@@ -274,9 +205,9 @@ select
     where p.index_code = i.code
   ) as latest_price_date,
   (
-    select max(trade_date)
-    from index_daily_valuations v
-    where v.index_code = i.code
+    select s.trade_date
+    from etf_valuation s
+    where s.tracking_index_code = i.code
   ) as latest_valuation_date,
   (
     select max(as_of_date)

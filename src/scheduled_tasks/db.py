@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 from collections.abc import Iterable, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from typing import Any
 from urllib.parse import parse_qsl, quote, unquote, urlencode
@@ -16,14 +16,6 @@ from psycopg.types.json import Jsonb
 
 # Prisma / 部分前端模板会带上；libpq/psycopg 不认
 _UNSUPPORTED_URI_QUERY_KEYS = frozenset({"pgbouncer"})
-
-
-@dataclass
-class EnrichmentResult:
-    """UPDATE-only 成交额补数结果。"""
-
-    updated_count: int
-    unmatched: list[dict[str, Any]] = field(default_factory=list)
 
 
 def _split_authority(url: str) -> tuple[str, str, str, str, str]:
@@ -267,28 +259,6 @@ def fetch_etf_pool(
         return list(cur.fetchall())
 
 
-def fetch_etf_amount_pending_dates(
-    conn: Connection[dict[str, Any]],
-    etf_code: str,
-    start: date,
-    end: date,
-) -> list[date]:
-    """返回区间内已有主行情且 amount 仍为空的交易日（供窗口覆盖核对）。"""
-    with conn.cursor() as cur:
-        cur.execute(
-            """
-            select trade_date
-            from public.etf_daily
-            where etf_code = %s
-              and trade_date between %s and %s
-              and amount is null
-            order by trade_date
-            """,
-            (etf_code, start, end),
-        )
-        return [row["trade_date"] for row in cur.fetchall()]
-
-
 def get_etf_max_trade_date(conn: Connection[dict[str, Any]], etf_code: str) -> date | None:
     with conn.cursor() as cur:
         cur.execute(
@@ -392,13 +362,13 @@ def upsert_etf_daily_bars(
             """
             insert into public.etf_daily (
               etf_code, trade_date,
-              open, high, low, close, volume, amount,
+              open, high, low, close, volume,
               open_qfq, high_qfq, low_qfq, close_qfq,
               open_hfq, high_hfq, low_hfq, close_hfq,
               price_source, updated_at
             ) values (
               %(etf_code)s, %(trade_date)s,
-              %(open)s, %(high)s, %(low)s, %(close)s, %(volume)s, %(amount)s,
+              %(open)s, %(high)s, %(low)s, %(close)s, %(volume)s,
               %(open_qfq)s, %(high_qfq)s, %(low_qfq)s, %(close_qfq)s,
               %(open_hfq)s, %(high_hfq)s, %(low_hfq)s, %(close_hfq)s,
               %(price_source)s, now()
@@ -409,7 +379,6 @@ def upsert_etf_daily_bars(
                 low = excluded.low,
                 close = excluded.close,
                 volume = excluded.volume,
-                amount = coalesce(excluded.amount, etf_daily.amount),
                 open_qfq = coalesce(excluded.open_qfq, etf_daily.open_qfq),
                 high_qfq = coalesce(excluded.high_qfq, etf_daily.high_qfq),
                 low_qfq = coalesce(excluded.low_qfq, etf_daily.low_qfq),
@@ -455,100 +424,74 @@ def update_etf_adj_columns(
     return len(values)
 
 
-def _enrichment_row_key(row: dict[str, Any]) -> tuple[str, date]:
-    trade_date = row["trade_date"]
-    if isinstance(trade_date, datetime):
-        trade_date = trade_date.date()
-    elif isinstance(trade_date, str):
-        trade_date = date.fromisoformat(trade_date)
-    return str(row["etf_code"]), trade_date
-
-
-def update_etf_daily_enrichment(
-    conn: Connection[dict[str, Any]],
-    rows: Iterable[dict[str, Any]],
-) -> EnrichmentResult:
-    """仅 UPDATE 已有主行情行的 amount / amount_source / amount_updated_at。
-
-    - 禁止 INSERT / upsert；无匹配行计入 unmatched，不中断批次。
-    - 禁止改 OHLC / volume / 复权列 / price_source / updated_at。
-    - 输入 (etf_code, trade_date) 必须唯一，重复键立即 fail-fast（尚未执行 SQL）。
-    """
-    values = list(rows)
-    if not values:
-        return EnrichmentResult(updated_count=0, unmatched=[])
-
-    input_keys: list[tuple[str, date]] = []
-    seen: set[tuple[str, date]] = set()
-    for row in values:
-        key = _enrichment_row_key(row)
-        if key in seen:
-            raise ValueError(
-                f"duplicate enrichment key before SQL: etf_code={key[0]} trade_date={key[1]}"
-            )
-        seen.add(key)
-        input_keys.append(key)
-        if "amount" not in row or "amount_source" not in row:
-            raise ValueError("enrichment row requires amount and amount_source")
-
-    with conn.cursor() as cur:
-        cur.execute(
-            """
-            with incoming as (
-              select *
-              from unnest(
-                %s::text[],
-                %s::date[],
-                %s::numeric[],
-                %s::text[]
-              ) as t(etf_code, trade_date, amount, amount_source)
-            )
-            update public.etf_daily as d
-            set amount = i.amount,
-                amount_source = i.amount_source,
-                amount_updated_at = now()
-            from incoming as i
-            where d.etf_code = i.etf_code
-              and d.trade_date = i.trade_date
-            returning d.etf_code, d.trade_date
-            """,
-            (
-                [k[0] for k in input_keys],
-                [k[1] for k in input_keys],
-                [row["amount"] for row in values],
-                [row["amount_source"] for row in values],
-            ),
-        )
-        returned = {(str(r["etf_code"]), r["trade_date"]) for r in cur.fetchall()}
-
-    unmatched = [
-        {"etf_code": code, "trade_date": trade_date.isoformat()}
-        for code, trade_date in input_keys
-        if (code, trade_date) not in returned
-    ]
-    return EnrichmentResult(updated_count=len(returned), unmatched=unmatched)
-
-
-def upsert_trade_calendar(
+def update_etf_daily_ohlc_official(
     conn: Connection[dict[str, Any]],
     rows: Iterable[dict[str, Any]],
 ) -> int:
-    """按 (market, cal_date) upsert 交易日历。"""
+    """官网纠偏：仅 UPDATE 已有行的不复权 OHLC；同步标记 price_source。"""
     values = list(rows)
     if not values:
         return 0
     with conn.cursor() as cur:
         cur.executemany(
             """
-            insert into public.trade_calendar (market, cal_date, is_open, updated_at)
-            values (%(market)s, %(cal_date)s, %(is_open)s, now())
-            on conflict (market, cal_date) do update
-            set is_open = excluded.is_open,
+            update public.etf_daily
+            set open = coalesce(%(open)s, open),
+                high = coalesce(%(high)s, high),
+                low = coalesce(%(low)s, low),
+                close = %(close)s,
+                price_source = %(price_source)s,
                 updated_at = now()
+            where etf_code = %(etf_code)s
+              and trade_date = %(trade_date)s
             """,
             values,
         )
     return len(values)
+
+
+def update_index_daily_close_official(
+    conn: Connection[dict[str, Any]],
+    rows: Iterable[dict[str, Any]],
+) -> int:
+    """官网纠偏：仅 UPDATE 已有行的指数收盘价。"""
+    values = list(rows)
+    if not values:
+        return 0
+    with conn.cursor() as cur:
+        cur.executemany(
+            """
+            update public.index_daily_prices
+            set close = %(close)s,
+                updated_at = now()
+            where index_code = %(index_code)s
+              and trade_date = %(trade_date)s
+            """,
+            values,
+        )
+    return len(values)
+
+
+def update_etf_valuation_pe_official(
+    conn: Connection[dict[str, Any]],
+    *,
+    tracking_index_code: str,
+    trade_date: date,
+    current_pe_ttm: float,
+) -> int:
+    """官网纠偏：仅 UPDATE 已有估值快照的当日 PE（不改 5y/10y）。"""
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            update public.etf_valuation
+            set current_pe_ttm = %s,
+                trade_date = %s,
+                updated_at = now()
+            where tracking_index_code = %s
+            """,
+            (current_pe_ttm, trade_date, tracking_index_code),
+        )
+        return cur.rowcount
 
 
 def get_fx_max_rate_date(conn: Connection[dict[str, Any]]) -> date | None:
@@ -580,6 +523,198 @@ def upsert_fx_rates(
             set rate = excluded.rate,
                 source = excluded.source,
                 updated_at = now()
+            """,
+            values,
+        )
+    return len(values)
+
+
+def fetch_etf_daily_rows(
+    conn: Connection[dict[str, Any]],
+    etf_code: str,
+    trade_dates: Sequence[date],
+) -> dict[date, dict[str, Any]]:
+    """按日期取 etf_daily 行（校验用）。"""
+    if not trade_dates:
+        return {}
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            select
+              etf_code, trade_date,
+              open, high, low, close, volume,
+              open_qfq, high_qfq, low_qfq, close_qfq,
+              open_hfq, high_hfq, low_hfq, close_hfq,
+              price_source
+            from public.etf_daily
+            where etf_code = %s
+              and trade_date = any(%s)
+            """,
+            (etf_code, list(trade_dates)),
+        )
+        return {row["trade_date"]: dict(row) for row in cur.fetchall()}
+
+
+def insert_etf_daily_bars_ignore_conflict(
+    conn: Connection[dict[str, Any]],
+    rows: Iterable[dict[str, Any]],
+) -> int:
+    """仅 INSERT 缺失 (etf_code, trade_date)；已有行不改写。"""
+    values = list(rows)
+    if not values:
+        return 0
+    with conn.cursor() as cur:
+        cur.executemany(
+            """
+            insert into public.etf_daily (
+              etf_code, trade_date,
+              open, high, low, close, volume,
+              open_qfq, high_qfq, low_qfq, close_qfq,
+              open_hfq, high_hfq, low_hfq, close_hfq,
+              price_source, updated_at
+            ) values (
+              %(etf_code)s, %(trade_date)s,
+              %(open)s, %(high)s, %(low)s, %(close)s, %(volume)s,
+              %(open_qfq)s, %(high_qfq)s, %(low_qfq)s, %(close_qfq)s,
+              %(open_hfq)s, %(high_hfq)s, %(low_hfq)s, %(close_hfq)s,
+              %(price_source)s, now()
+            )
+            on conflict (etf_code, trade_date) do nothing
+            """,
+            values,
+        )
+    return len(values)
+
+
+def ensure_index_row(
+    conn: Connection[dict[str, Any]],
+    *,
+    code: str,
+    name: str,
+    category: str = "行业主题",
+    display_order: int = 0,
+) -> None:
+    """确保 indices 元数据行存在（FK 前置）；已有行不覆盖 name/category。"""
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            insert into public.indices (code, name, category, display_order)
+            values (%s, %s, %s, %s)
+            on conflict (code) do nothing
+            """,
+            (code, name, category, display_order),
+        )
+
+
+def fetch_index_daily_prices(
+    conn: Connection[dict[str, Any]],
+    index_code: str,
+    trade_dates: Sequence[date],
+) -> dict[date, dict[str, Any]]:
+    if not trade_dates:
+        return {}
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            select index_code, trade_date, close
+            from public.index_daily_prices
+            where index_code = %s
+              and trade_date = any(%s)
+            """,
+            (index_code, list(trade_dates)),
+        )
+        return {row["trade_date"]: dict(row) for row in cur.fetchall()}
+
+
+def insert_index_daily_prices_ignore_conflict(
+    conn: Connection[dict[str, Any]],
+    rows: Iterable[dict[str, Any]],
+) -> int:
+    values = list(rows)
+    if not values:
+        return 0
+    with conn.cursor() as cur:
+        cur.executemany(
+            """
+            insert into public.index_daily_prices (
+              index_code, trade_date, close, updated_at
+            ) values (
+              %(index_code)s, %(trade_date)s, %(close)s, now()
+            )
+            on conflict (index_code, trade_date) do nothing
+            """,
+            values,
+        )
+    return len(values)
+
+
+def fetch_etf_valuation_snapshot(
+    conn: Connection[dict[str, Any]],
+    tracking_index_code: str,
+) -> dict[str, Any] | None:
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            select
+              tracking_index_code, trade_date,
+              current_pe_ttm, pe_ttm_avg_5y, pe_ttm_avg_10y, updated_at
+            from public.etf_valuation
+            where tracking_index_code = %s
+            """,
+            (tracking_index_code,),
+        )
+        row = cur.fetchone()
+    return dict(row) if row else None
+
+
+def upsert_etf_valuation_snapshot(
+    conn: Connection[dict[str, Any]],
+    row: dict[str, Any],
+) -> None:
+    """刷新跟踪指数估值快照（当日 PE + 5y/10y 均值）；按 tracking_index_code upsert。"""
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            insert into public.etf_valuation (
+              tracking_index_code, trade_date,
+              current_pe_ttm, pe_ttm_avg_5y, pe_ttm_avg_10y, updated_at
+            ) values (
+              %(tracking_index_code)s, %(trade_date)s,
+              %(current_pe_ttm)s, %(pe_ttm_avg_5y)s, %(pe_ttm_avg_10y)s, now()
+            )
+            on conflict (tracking_index_code) do update
+            set trade_date = excluded.trade_date,
+                current_pe_ttm = excluded.current_pe_ttm,
+                pe_ttm_avg_5y = excluded.pe_ttm_avg_5y,
+                pe_ttm_avg_10y = excluded.pe_ttm_avg_10y,
+                updated_at = now()
+            """,
+            row,
+        )
+
+
+def replace_index_industry_weights(
+    conn: Connection[dict[str, Any]],
+    index_code: str,
+    rows: Iterable[dict[str, Any]],
+) -> int:
+    """以红色火箭为该指数行业权重主源：删光后写入本次快照行。"""
+    values = list(rows)
+    with conn.cursor() as cur:
+        cur.execute(
+            "delete from public.index_industry_weights where index_code = %s",
+            (index_code,),
+        )
+        if not values:
+            return 0
+        cur.executemany(
+            """
+            insert into public.index_industry_weights (
+              index_code, as_of_date, sw_level, industry_name, weight_pct, updated_at
+            ) values (
+              %(index_code)s, %(as_of_date)s, %(sw_level)s, %(industry_name)s,
+              %(weight_pct)s, now()
+            )
             """,
             values,
         )

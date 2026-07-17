@@ -1,6 +1,5 @@
 """ETF 日 K 拉取（Yahoo Finance / yfinance）。
 
-GitHub Actions 海外 runner 上 BaoStock 会截断、东财/AkShare 会断连；
 Yahoo 可稳定返回 A 股 ETF 全历史。Close 为不复权，Adj Close 为前复权；
 后复权由首日因子推导。
 """
@@ -49,8 +48,8 @@ def parse_trade_date(value: Any) -> date:
 def retry_call(
     fn: Callable[[], T],
     *,
-    attempts: int = 3,
-    base_delay_sec: float = 1.5,
+    attempts: int = 5,
+    base_delay_sec: float = 2.0,
 ) -> T:
     last_error: BaseException | None = None
     for i in range(attempts):
@@ -60,7 +59,12 @@ def retry_call(
             last_error = error
             if i + 1 >= attempts:
                 break
-            time.sleep(base_delay_sec * (i + 1))
+            msg = str(error).lower()
+            # Yahoo 限流时拉长等待
+            if "rate" in msg or "too many" in msg or "429" in msg:
+                time.sleep(base_delay_sec * (i + 1) * 3)
+            else:
+                time.sleep(base_delay_sec * (i + 1))
     assert last_error is not None
     raise last_error
 
@@ -210,7 +214,6 @@ def build_three_adjustments(
                 "low": low,
                 "close": close,
                 "volume": volume_lots,
-                "amount": None,  # Yahoo 无成交额
                 "open_qfq": open_qfq,
                 "high_qfq": high_qfq,
                 "low_qfq": low_qfq,

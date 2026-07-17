@@ -11,7 +11,7 @@ sync is stable.
 - Detail page can read from base tables:
   - `indices`
   - `index_daily_prices`
-  - `index_daily_valuations`
+  - `etf_valuation`（当日 PE + 5y/10y 均值；无日估值序列）
   - `index_industry_weights`
 - `index_detail_snapshot` is a lightweight verification view, not a complete
   detail API replacement.

@@ -1,42 +1,44 @@
-name: 同步 ETF 日 K 到 Supabase
+name: 官网双源校验（ETF）
 
 on:
   schedule:
-    # 工作日北京时间约 18:10 / 18:30 / 19:00 → incremental
-    - cron: "10,30 10 * * 1-5"
-    - cron: "0 11 * * 1-5"
-    # 每周日北京时间上午 10:00 → adj_check
-    - cron: "0 2 * * 0"
+    # 工作日北京时间约 20:00（ETF 日 K 同步之后）
+    - cron: "0 12 * * 1-5"
   workflow_dispatch:
     inputs:
       mode:
-        description: "同步模式"
+        description: "校验窗口"
         required: true
         type: choice
         options:
           - incremental
-          - adj_check
           - full
         default: incremental
-      codes:
-        description: "可选：逗号分隔 6 位 ETF 代码（跳过 21 只断言）"
-        required: false
-        type: string
-      force:
-        description: "仅 adj_check：跳过检测强制重刷复权列"
+      from_pool:
+        description: "校验 etf_pool 内全部沪市 ETF（深市跳过）"
         required: false
         type: boolean
-        default: false
+        default: true
+      etf_code:
+        description: "单标的模式时的 ETF 代码（from_pool=false 时生效）"
+        required: false
+        type: string
+        default: "512170"
+      lookback_bars:
+        description: "incremental 回看根数"
+        required: false
+        type: string
+        default: "30"
 
 permissions:
   contents: read
 
 jobs:
-  sync-etf:
+  official-cross-check:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     concurrency:
-      group: sync-etf-kline
+      group: sync-official-cross-check
       cancel-in-progress: false
 
     steps:
@@ -61,49 +63,50 @@ jobs:
       - name: Install dependencies
         run: python -m pip install -e .
 
-      - name: Determine sync mode
-        id: mode
+      - name: Determine args
+        id: args
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             echo "mode=${{ inputs.mode }}" >> "$GITHUB_OUTPUT"
+            echo "from_pool=${{ inputs.from_pool }}" >> "$GITHUB_OUTPUT"
+            echo "etf_code=${{ inputs.etf_code }}" >> "$GITHUB_OUTPUT"
+            echo "lookback_bars=${{ inputs.lookback_bars }}" >> "$GITHUB_OUTPUT"
           else
-            # schedule: 周日 cron 为 "0 2 * * 0"；其余工作日为 incremental
-            dow=$(date -u +%u)
-            if [ "$dow" = "7" ]; then
-              echo "mode=adj_check" >> "$GITHUB_OUTPUT"
-            else
-              echo "mode=incremental" >> "$GITHUB_OUTPUT"
-            fi
+            echo "mode=incremental" >> "$GITHUB_OUTPUT"
+            echo "from_pool=true" >> "$GITHUB_OUTPUT"
+            echo "etf_code=512170" >> "$GITHUB_OUTPUT"
+            echo "lookback_bars=30" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Sync ETF kline
+      - name: Official cross-check (compare-only)
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          SYNC_MODE: ${{ steps.mode.outputs.mode }}
-          INPUT_CODES: ${{ inputs.codes }}
-          INPUT_FORCE: ${{ inputs.force }}
+          SYNC_MODE: ${{ steps.args.outputs.mode }}
+          FROM_POOL: ${{ steps.args.outputs.from_pool }}
+          ETF_CODE: ${{ steps.args.outputs.etf_code }}
+          LOOKBACK_BARS: ${{ steps.args.outputs.lookback_bars }}
         run: |
           set -euo pipefail
           mkdir -p artifacts
-          args=(--mode="$SYNC_MODE")
-          if [ -n "${INPUT_CODES:-}" ]; then
-            args+=(--codes="$INPUT_CODES")
+          args=(--mode="$SYNC_MODE" --lookback-bars="$LOOKBACK_BARS")
+          if [ "${FROM_POOL}" = "true" ]; then
+            args+=(--from-pool)
+          else
+            args+=(--etf-code="$ETF_CODE" --skip-index)
           fi
-          if [ "${INPUT_FORCE:-false}" = "true" ]; then
-            args+=(--force)
-          fi
-          python -m scheduled_tasks.jobs.sync_etf_kline_yfinance "${args[@]}"
+          # 定时/手动默认只比对，绝不自动 --apply-official
+          python -m scheduled_tasks.jobs.sync_official_cross_check "${args[@]}"
 
       - name: Upload summary artifact
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: sync-etf-summary
-          path: artifacts/sync_etf_kline_summary.json
+          name: sync-official-cross-check-summary
+          path: artifacts/sync_official_cross_check_summary.json
           if-no-files-found: warn
 
   notify-bark:
-    needs: sync-etf
+    needs: official-cross-check
     if: always()
     runs-on: ubuntu-latest
     steps:
@@ -111,13 +114,13 @@ jobs:
         uses: actions/download-artifact@v4
         continue-on-error: true
         with:
-          name: sync-etf-summary
+          name: sync-official-cross-check-summary
           path: artifacts
 
       - name: Push Bark notification
         env:
           BARK_KEY: ${{ secrets.BARK_KEY }}
-          JOB_RESULT: ${{ needs.sync-etf.result }}
+          JOB_RESULT: ${{ needs.official-cross-check.result }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           set -euo pipefail
@@ -126,40 +129,35 @@ jobs:
             exit 0
           fi
 
-          summary_file="artifacts/sync_etf_kline_summary.json"
+          summary_file="artifacts/sync_official_cross_check_summary.json"
           if [ -f "$summary_file" ]; then
             eval "$(python - <<'PY'
           import json
-          d = json.load(open("artifacts/sync_etf_kline_summary.json", encoding="utf-8"))
+          d = json.load(open("artifacts/sync_official_cross_check_summary.json", encoding="utf-8"))
           def esc(v):
               return str(v).replace("'", "'\\''")
-          print(f"mode='{esc(d.get('mode',''))}'")
           print(f"status='{esc(d.get('status',''))}'")
-          print(f"success_count='{esc(d.get('success_count',0))}'")
-          print(f"failure_count='{esc(d.get('failure_count',0))}'")
-          print(f"pool_size='{esc(d.get('pool_size',0))}'")
-          print(f"max_trade_date='{esc(d.get('max_trade_date') or '-')}'")
-          print(f"refreshed='{esc(','.join(d.get('refreshed_codes') or []) or '-')}'")
-          print(f"skipped='{esc(len(d.get('skipped_codes') or []))}'")
-          print(f"detect_failed='{esc(','.join(d.get('detect_failed_codes') or []) or '-')}'")
-          print(f"needs_full='{esc(','.join(d.get('needs_full_codes') or []) or '-')}'")
-          print(f"adj_gap='{esc(','.join(d.get('adj_gap_codes') or []) or '-')}'")
+          print(f"etf_checked='{esc(len(d.get('etf_codes_checked') or []))}'")
+          print(f"etf_mismatch='{esc(d.get('etf_mismatch_count',0))}'")
+          print(f"etf_validated='{esc(d.get('etf_validated',0))}'")
+          print(f"skipped_szse='{esc(len(d.get('etf_codes_skipped_szse') or []))}'")
+          print(f"from_pool='{esc(d.get('from_pool', False))}'")
           PY
           )"
             case "$status" in
-              success) title="ETF日K同步成功" ;;
-              partial) title="ETF日K同步部分成功" ;;
-              *) title="ETF日K同步失败" ;;
+              success) title="官网校验通过" ;;
+              partial) title="官网校验发现差异" ;;
+              *) title="官网校验失败" ;;
             esac
-            body="job=sync_etf_kline_yfinance mode=${mode} status=${status} success=${success_count} fail=${failure_count} pool=${pool_size} max_date=${max_trade_date} refreshed=${refreshed} skipped=${skipped} detect_failed=${detect_failed} needs_full=${needs_full} adj_gap=${adj_gap}
+            body="job=sync_official_cross_check status=${status} from_pool=${from_pool} checked=${etf_checked} validated=${etf_validated} mismatch=${etf_mismatch} skipped_szse=${skipped_szse}
           ${RUN_URL}"
           else
             case "$JOB_RESULT" in
-              success) title="ETF日K同步成功" ;;
-              cancelled) title="ETF日K同步取消" ;;
-              *) title="ETF日K同步失败" ;;
+              success) title="官网校验通过" ;;
+              cancelled) title="官网校验取消" ;;
+              *) title="官网校验失败" ;;
             esac
-            body="job=sync_etf_kline_yfinance result=${JOB_RESULT} summary missing
+            body="job=sync_official_cross_check result=${JOB_RESULT} summary missing
           ${RUN_URL}"
           fi
 

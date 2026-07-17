@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "GitHub Actions jobs: ETF daily bars (yfinance) and FX rates (Frankfurter) into Supabase; cockpit ledger DDL/RLS."
 requires-python = ">=3.11"
 dependencies = [
+  "certifi>=2024.0.0",
   "pandas>=2.0.0",
   "psycopg[binary]>=3.2.0",
   "yfinance>=0.2.40",
@@ -13,14 +14,6 @@ dependencies = [
 dev = [
   "pytest>=8.0.0",
   "ruff>=0.8.0",
-]
-# 国内数据源（AKShare/BaoStock）：仅在国内 Hermes 机器安装/运行，
-# 不进入海外 GitHub Actions runner 的主依赖，避免加重海外安装负担、
-# 与该 runner 上已知的 BaoStock 截断 / 东财断连问题耦合。
-# 安装：pip install -e '.[domestic]'
-domestic = [
-  "akshare==1.18.64",
-  "baostock==0.9.3",
 ]
 
 [tool.pytest.ini_options]

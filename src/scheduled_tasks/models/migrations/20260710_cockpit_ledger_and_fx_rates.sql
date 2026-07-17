@@ -326,7 +326,7 @@ create table if not exists public.review_entries (
 
 create index if not exists review_entries_user_id_idx on public.review_entries (user_id);
 
-create table if not exists public.portfolio_snapshots (
+create table if not exists public.portfolio (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users (id) on delete cascade,
   as_of_date date not null,
@@ -335,13 +335,13 @@ create table if not exists public.portfolio_snapshots (
   total_assets_base numeric(20, 8) not null,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
-  constraint portfolio_snapshots_user_date_unique unique (user_id, as_of_date)
+  constraint portfolio_user_date_unique unique (user_id, as_of_date)
 );
 
-create index if not exists portfolio_snapshots_user_id_idx
-  on public.portfolio_snapshots (user_id);
-create index if not exists portfolio_snapshots_as_of_date_idx
-  on public.portfolio_snapshots (as_of_date desc);
+create index if not exists portfolio_user_id_idx
+  on public.portfolio (user_id);
+create index if not exists portfolio_as_of_date_idx
+  on public.portfolio (as_of_date desc);
 
 -- ---------------------------------------------------------------------------
 -- RLS：账本按 user_id；共享行情/汇率 authenticated 只读
@@ -402,7 +402,7 @@ select public.cockpit_apply_owner_rls('public.decision_logs');
 select public.cockpit_apply_owner_rls('public.trade_records');
 select public.cockpit_apply_owner_rls('public.cash_flows');
 select public.cockpit_apply_owner_rls('public.review_entries');
-select public.cockpit_apply_owner_rls('public.portfolio_snapshots');
+select public.cockpit_apply_owner_rls('public.portfolio');
 
 -- 共享只读策略（job 使用 DATABASE_URL / 表所有者绕过 RLS）
 create or replace function public.cockpit_apply_authenticated_read(p_table regclass)
@@ -455,7 +455,7 @@ grant select, insert, update, delete on
   public.trade_records,
   public.cash_flows,
   public.review_entries,
-  public.portfolio_snapshots
+  public.portfolio
 to authenticated;
 
 grant select on public.fx_rates to authenticated;

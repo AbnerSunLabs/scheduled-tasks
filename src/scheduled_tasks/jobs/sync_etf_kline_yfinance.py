@@ -1,6 +1,6 @@
 """Sync ETF daily bars from Yahoo Finance into Supabase PostgreSQL.
 
-海外 GitHub Actions runner 上 BaoStock / 东财 AkShare 不可用，故价格主源为 yfinance。
+海外 GitHub Actions runner 可直接拉 Yahoo；ETF 价格主源为 yfinance。
 """
 
 from __future__ import annotations
@@ -8,6 +8,7 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import time
 import traceback
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
@@ -38,11 +39,13 @@ from scheduled_tasks.etf.yfinance_client import (
 
 JOB_NAME = "sync_etf_kline_yfinance"
 EXCLUDED_CODES = frozenset({"512660", "159992"})
-EXPECTED_POOL_SIZE = 25
+EXPECTED_POOL_SIZE = 21
 ETF_CODE_RE = re.compile(r"^\d{6}$")
 SUMMARY_PATH = Path("artifacts/sync_etf_kline_summary.json")
 DEFAULT_LOOKBACK_DAYS = 5
 DEFAULT_ADJ_EPSILON = 0.001
+# Yahoo 对连续拉取较敏感；标的间稍作间隔降低限流概率
+INTER_SYMBOL_DELAY_SEC = 2.0
 PRICE_SOURCE = "yfinance"
 
 
@@ -373,7 +376,7 @@ def run_sync(args: argparse.Namespace) -> int:
             }
             run_id = create_sync_run(conn, JOB_NAME, codes, meta=meta)
 
-            for etf_code in codes:
+            for idx, etf_code in enumerate(codes):
                 try:
                     print(f"[etf] syncing {etf_code} mode={args.mode}")
                     if args.mode in {"full", "incremental"}:
@@ -421,6 +424,8 @@ def run_sync(args: argparse.Namespace) -> int:
                     failures.append(_error_summary(etf_code, error))
                     print(f"[etf] failed {etf_code}: {error}")
                     print(traceback.format_exc())
+                if idx + 1 < len(codes):
+                    time.sleep(INTER_SYMBOL_DELAY_SEC)
 
             finish_meta: dict[str, Any] = {
                 "mode": args.mode,
@@ -498,7 +503,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--codes",
         type=str,
         default=None,
-        help="逗号分隔 6 位 ETF 代码，跳过 25 只断言",
+        help="逗号分隔 6 位 ETF 代码，跳过 21 只断言",
     )
     parser.add_argument(
         "--lookback-days",

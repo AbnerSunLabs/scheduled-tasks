@@ -1,5 +1,7 @@
 # Spike 报告：AKShare / BaoStock 作为 ETF 成交额（amount）补充数据源
 
+> **已废弃（2026-07-17）**：`etf_daily` 不再维护成交额；`sync_etf_enrich_akshare` 与 BaoStock 成交额兜底已删除。本文仅保留历史 Spike 记录。BaoStock / AKShare / `trade_calendar` 均已停用；见 [hermes-domestic-cron.md](./hermes-domestic-cron.md)。
+
 对应计划：`stock-charts/docs/superpowers/plans/2026-07-15-domestic-baostock-akshare-enrichment.md` §4。
 脚本：`scripts/spike_baostock_akshare.py`；机器可读全量结果：`doc/spike-baostock-akshare.raw.json`。
 
