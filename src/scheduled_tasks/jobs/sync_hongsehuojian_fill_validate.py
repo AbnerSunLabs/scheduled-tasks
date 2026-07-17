@@ -373,14 +373,14 @@ def run(
                 conn, index_code, remote_prices, epsilon=epsilon, summary=summary
             )
 
+            remote_weights = fetch_index_industry_weights(index_code)
+            refresh_index_industry_weights(
+                conn, index_code, remote_weights, summary=summary
+            )
+
         remote_val = fetch_index_pe_snapshot(index_code)
         upsert_index_valuation_snapshot(
             conn, index_code, remote_val, epsilon=epsilon, summary=summary
-        )
-
-        remote_weights = fetch_index_industry_weights(index_code)
-        refresh_index_industry_weights(
-            conn, index_code, remote_weights, summary=summary
         )
 
         conn.commit()

@@ -75,19 +75,20 @@
 ## 行为语义
 
 ```
-拉官网窗口（incremental 默认近 N 日 / full 可拉长）
+拉官网窗口（incremental 默认近 N 日；full：ETF begin=-10000 / 指数自 2004-01-01）
+  → 官网空响应或总 validated=0 → failed（不得 success）
   → 与库中已有 (code, trade_date) 对齐
-  → 一致：validated++
-  → 不一致：mismatch 样本写入 summary / sync_runs.meta；可 Bark
-  → 库缺官网有：missing_in_db（不 INSERT）
-  → 库有官网无：missing_in_official（观测，不删库）
+    → 一致：validated++
+    → 不一致：mismatch 样本写入 summary / sync_runs.meta；可 Bark
+    → 库缺官网有：missing_in_db（不 INSERT）
+    → 库有官网无：missing_in_official（观测，不删库）
 
 默认：禁止 UPDATE / INSERT
 --apply-official：仅对 mismatch 行用官网字段 UPDATE；仍不 INSERT 缺日
 ```
 
 - 数值容差：默认 `epsilon=0.001`（CLI 可覆盖），复用现有 `values_mismatch` 语义（两侧皆空算一致；一侧空一侧非空算不一致）。
-- 退出码：存在 mismatch（或配置为「有 missing_in_db 也失败」）时非零，便于调度告警。
+- 退出码：存在 mismatch、源失败、或 `validated=0` 时非零，便于调度告警。
 
 ## 工程落点（名实相符）
 

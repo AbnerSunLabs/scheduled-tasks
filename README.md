@@ -69,6 +69,8 @@ psql "$DATABASE_URL" -f src/scheduled_tasks/models/migrations/20260709_etf_renam
 
 ```bash
 psql "$DATABASE_URL" -f src/scheduled_tasks/models/migrations/20260710_cockpit_ledger_and_fx_rates.sql
+# 新库已是 etf_pool 时补 authenticated 只读（幂等；旧版 20260710 只认 etf_pool_snapshots）
+psql "$DATABASE_URL" -f src/scheduled_tasks/models/migrations/20260718_etf_pool_authenticated_read.sql
 ```
 
 4. **ETF 池表更名**（live 仍为 `etf_pool_snapshots` 时必跑；须单独授权，**不得**与 cleanup migration 同批执行）：

@@ -12,7 +12,7 @@ RLS：
 - 账本表：`authenticated` 仅能读写 `user_id = auth.uid()` 的行。
 - 已授权共享只读（`authenticated` SELECT；job 经 `DATABASE_URL` 写入）：`fx_rates`、`etf_daily`、`etf_pool`、`indices`、`index_daily_prices`。
 - **尚未**在 cockpit migration 中显式 grant / RLS 的共享表：`etf_valuation`、`index_industry_weights`（及依赖它们的指数视图）。客户端若需读，需另补 GRANT/policy。
-- `schema.sql` 本身不含完整 RLS；已有库请执行 `20260710_cockpit_ledger_and_fx_rates.sql`。
+- `schema.sql` 本身不含完整 RLS；已有库请执行 `20260710_cockpit_ledger_and_fx_rates.sql`，并补跑 `20260718_etf_pool_authenticated_read.sql`（新库 `etf_pool` 只读策略；幂等）。
 
 > 已有库若仍为 `etf_grid_*` 旧名，请先执行：
 > `psql "$DATABASE_URL" -f src/scheduled_tasks/models/migrations/20260709_etf_rename_and_adj_columns.sql`
@@ -238,7 +238,7 @@ erDiagram
 
 **索引：** `fx_rates_rate_date_idx`：`(rate_date DESC)`
 
-RLS：`authenticated` SELECT；job 经 `DATABASE_URL` 写入。表定义见 `schema.sql`；RLS / GRANT 见 `20260710_cockpit_ledger_and_fx_rates.sql`（`schema.sql` **不含** RLS）。
+RLS：`authenticated` SELECT；job 经 `DATABASE_URL` 写入。表定义见 `schema.sql`；RLS / GRANT 见 `20260710_cockpit_ledger_and_fx_rates.sql` + `20260718_etf_pool_authenticated_read.sql`（`schema.sql` **不含** RLS）。
 
 ---
 
@@ -302,6 +302,8 @@ psql "$DATABASE_URL" -f src/scheduled_tasks/models/schema.sql
 
 # 驾驶舱账本 12 表 + fx_rates/共享表 RLS（新库与已有库均需）
 psql "$DATABASE_URL" -f src/scheduled_tasks/models/migrations/20260710_cockpit_ledger_and_fx_rates.sql
+# 补 etf_pool authenticated 只读（幂等；新库 schema 建 etf_pool 时旧版 20260710 可能漏配）
+psql "$DATABASE_URL" -f src/scheduled_tasks/models/migrations/20260718_etf_pool_authenticated_read.sql
 
 # —— 以下为已有库升级（新库若已跑最新 schema.sql，多数可跳过；以各文件头注释为准）——
 

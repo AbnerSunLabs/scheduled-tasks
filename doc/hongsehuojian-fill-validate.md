@@ -46,13 +46,15 @@ python3 -m pip install -e ".[dev]"
 unset DATABASE_URL   # 如需强制用 .env
 # 默认 incremental（近 30 根，较快）
 python3 -m scheduled_tasks.jobs.sync_hongsehuojian_fill_validate
-# 只刷估值（当日 PE + 5y/10y 均值）
+# 只刷估值（当日 PE + 5y/10y 均值；不拉 K 线、不刷新行业权重）
 python3 -m scheduled_tasks.jobs.sync_hongsehuojian_fill_validate --mode=valuation-only
-# 首次补全历史
+# 首次补全历史（含行业权重刷新）
 python3 -m scheduled_tasks.jobs.sync_hongsehuojian_fill_validate --mode=full
 ```
 
 摘要：`artifacts/sync_hongsehuojian_fill_validate_summary.json`
+
+`valuation-only` 仅 upsert `etf_valuation`（当日 PE + 5y/10y）；**不**拉 K 线、**不**刷新 `index_industry_weights`。
 
 官网交叉校验（上交所 / 中证 vs 库）见 [official-cross-check.md](./official-cross-check.md)，与本 job 互补：本 job 主写补缺，官网 job 只比对/可选纠偏。
 

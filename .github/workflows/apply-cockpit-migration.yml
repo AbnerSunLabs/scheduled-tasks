@@ -2,6 +2,7 @@ name: 应用驾驶舱 Migration
 
 # 部署顺序（绑定，自上而下）：
 #   1. 20260710_cockpit_ledger_and_fx_rates.sql
+#   1b. 20260718_etf_pool_authenticated_read.sql（补 etf_pool RLS/GRANT；幂等）
 #   2. 20260715_rename_etf_pool_snapshots_to_etf_pool.sql（独立步骤，幂等）
 #   3. 清理 migrations（drop amount 列 + drop trade_calendar；独立步骤）
 #
@@ -64,7 +65,9 @@ jobs:
           set -euo pipefail
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 \
             -f src/scheduled_tasks/models/migrations/20260710_cockpit_ledger_and_fx_rates.sql
-          echo "cockpit ledger + fx_rates migration applied"
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 \
+            -f src/scheduled_tasks/models/migrations/20260718_etf_pool_authenticated_read.sql
+          echo "cockpit ledger + fx_rates + etf_pool read migration applied"
 
       - name: Verify cockpit ledger tables exist
         env:

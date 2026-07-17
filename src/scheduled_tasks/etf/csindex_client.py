@@ -97,7 +97,8 @@ def fetch_index_daily_bars(
     )
     url = f"{base_url.rstrip('/')}/csindex-home/perf/index-perf?{query}"
     payload = getter(url)
-    if str(payload.get("code")) not in {"200", "0"} and not payload.get("success", True):
+    # 错误码异常或 success=false 任一即失败（缺 success 字段时仅看 code）
+    if str(payload.get("code")) not in {"200", "0"} or payload.get("success") is False:
         raise RuntimeError(f"csindex index-perf failed: {payload.get('msg') or payload}")
 
     rows: list[dict[str, Any]] = []

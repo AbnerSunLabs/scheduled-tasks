@@ -431,7 +431,10 @@ begin
   if to_regclass('public.etf_daily') is not null then
     perform public.cockpit_apply_authenticated_read('public.etf_daily');
   end if;
-  if to_regclass('public.etf_pool_snapshots') is not null then
+  -- 新库 schema.sql 建 etf_pool；旧库可能仍为 etf_pool_snapshots（rename 前）
+  if to_regclass('public.etf_pool') is not null then
+    perform public.cockpit_apply_authenticated_read('public.etf_pool');
+  elsif to_regclass('public.etf_pool_snapshots') is not null then
     perform public.cockpit_apply_authenticated_read('public.etf_pool_snapshots');
   end if;
   if to_regclass('public.indices') is not null then
@@ -465,7 +468,9 @@ begin
   if to_regclass('public.etf_daily') is not null then
     execute 'grant select on public.etf_daily to authenticated';
   end if;
-  if to_regclass('public.etf_pool_snapshots') is not null then
+  if to_regclass('public.etf_pool') is not null then
+    execute 'grant select on public.etf_pool to authenticated';
+  elsif to_regclass('public.etf_pool_snapshots') is not null then
     execute 'grant select on public.etf_pool_snapshots to authenticated';
   end if;
   if to_regclass('public.indices') is not null then

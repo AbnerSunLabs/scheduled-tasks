@@ -17,6 +17,8 @@
 - **默认**：只比对，**不 UPDATE / 不 INSERT**
 - **`--apply-official --yes`**：仅对 mismatch 行用官网字段 UPDATE；缺日仍不 INSERT
 - **`--from-pool`**：校验 `etf_pool` 内全部沪市 ETF；自动 `--skip-index`（避免单指数绑死全池）
+- **`--mode=full`**：ETF 拉 `begin=-10000`（覆盖老标的全历史）；指数从 `2004-01-01` 拉到 `--end`
+- 官网返回空数组、或总 `validated=0` → `status=failed`（不再静默 success）
 - 容差：价格 `--epsilon`（默认 `0.001`）；指数 close 先四舍五入到 2 位再比；PE `--pe-epsilon`（默认 `3.0`，红火箭 vs 中证常见差约 2 点）
 - 退出码：存在 mismatch、源失败或 `status=failed` → 非 0
 

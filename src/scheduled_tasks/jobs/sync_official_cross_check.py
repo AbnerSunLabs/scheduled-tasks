@@ -28,8 +28,12 @@ from scheduled_tasks.db import (
     update_etf_valuation_pe_official,
     update_index_daily_close_official,
 )
-from scheduled_tasks.etf.csindex_client import fetch_index_window
+from scheduled_tasks.etf.csindex_client import (
+    fetch_index_daily_bars,
+    fetch_index_window,
+)
 from scheduled_tasks.etf.sse_client import fetch_etf_daily_bars
+from scheduled_tasks.etf.yfinance_client import DEFAULT_HISTORY_START
 
 JOB_NAME = "sync_official_cross_check"
 SUMMARY_PATH = Path("artifacts/sync_official_cross_check_summary.json")
@@ -41,6 +45,8 @@ DEFAULT_EPSILON = 0.001
 DEFAULT_PE_EPSILON = 3.0
 DEFAULT_LOOKBACK_BARS = 30
 DEFAULT_INDEX_LOOKBACK_DAYS = 45
+# full：SSE begin=-N；约 40 年交易日，覆盖 510300 等老标的全历史
+FULL_ETF_MAX_BARS = 10_000
 MAX_MISMATCH_SAMPLES = 50
 # 全池连打 yunhq 易断连；标的间稍作间隔
 INTER_SYMBOL_DELAY_SEC = 0.8
@@ -340,9 +346,8 @@ def run(
         from_pool=from_pool,
     )
     end = end or date.today()
-    # full：上交所 begin 用较大窗口；中证用较长日历跨度
-    etf_bars = 2000 if mode == "full" else lookback_bars
-    idx_days = 4000 if mode == "full" else index_lookback_days
+    # full：SSE 拉足够深的 begin=-N；中证从 DEFAULT_HISTORY_START 到 end
+    etf_bars = FULL_ETF_MAX_BARS if mode == "full" else lookback_bars
 
     conn = connect(settings.database_url)
     run_id: int | None = None
@@ -363,6 +368,9 @@ def run(
         if not skip_index:
             tracked_codes.append(index_code)
 
+        if not etf_codes and skip_index:
+            raise RuntimeError("no symbols selected for official cross-check")
+
         run_id = create_sync_run(
             conn,
             JOB_NAME,
@@ -375,6 +383,12 @@ def run(
                 "skip_index": skip_index,
                 "epsilon": epsilon,
                 "lookback_bars": None if mode == "full" else lookback_bars,
+                "etf_bars": etf_bars,
+                "index_start": (
+                    DEFAULT_HISTORY_START.isoformat()
+                    if mode == "full"
+                    else None
+                ),
                 "end": end.isoformat(),
                 "skipped_szse": summary.etf_codes_skipped_szse,
             },
@@ -383,6 +397,8 @@ def run(
         for idx, code in enumerate(etf_codes):
             try:
                 etf_rows = fetch_etf_daily_bars(code, max_bars=etf_bars)
+                if not etf_rows:
+                    raise RuntimeError("sse returned empty kline")
                 cross_check_etf(
                     conn,
                     code,
@@ -399,9 +415,20 @@ def run(
 
         if not skip_index:
             try:
-                index_rows = fetch_index_window(
-                    index_code, lookback_days=idx_days, end=end
-                )
+                if mode == "full":
+                    index_rows = fetch_index_daily_bars(
+                        index_code,
+                        start=DEFAULT_HISTORY_START,
+                        end=end,
+                    )
+                else:
+                    index_rows = fetch_index_window(
+                        index_code,
+                        lookback_days=index_lookback_days,
+                        end=end,
+                    )
+                if not index_rows:
+                    raise RuntimeError("csindex returned empty data")
                 for row in index_rows:
                     row["index_code"] = index_code
                 cross_check_index(
@@ -422,14 +449,23 @@ def run(
             + summary.index_mismatch_count
             + summary.valuation_mismatch_count
         )
-        if summary.source_errors and summary.etf_validated == 0 and summary.index_validated == 0:
+        validated_total = (
+            summary.etf_validated
+            + summary.index_validated
+            + summary.valuation_validated
+        )
+        # 空响应 / 结构改版导致 0 条校验，不得记 success
+        if validated_total == 0:
             summary.status = "failed"
             summary.success_count = 0
+            summary.failure_count = max(summary.failure_count, 1)
+            if not summary.source_errors:
+                summary.source_errors.append(
+                    "no rows validated (empty official data or no db overlap)"
+                )
         elif mismatch_total > 0 or summary.source_errors:
             summary.status = "partial"
-            summary.success_count = 1 if (
-                summary.etf_validated or summary.index_validated
-            ) else 0
+            summary.success_count = 1
             summary.failure_count = max(summary.failure_count, 1)
         else:
             summary.status = "success"
@@ -447,6 +483,13 @@ def run(
                         f"index={summary.index_mismatch_count} "
                         f"valuation={summary.valuation_mismatch_count}"
                     ),
+                }
+            ]
+        elif summary.status == "failed" and not failures:
+            failures = [
+                {
+                    "code": "validated_zero",
+                    "error": "no rows validated",
                 }
             ]
         success_codes = [] if summary.status == "failed" else list(tracked_codes)

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import date
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -258,3 +258,56 @@ def test_fetch_index_industry_weights_maps_levels(monkeypatch: pytest.MonkeyPatc
     assert by_level[("sw2", "医疗器械")] == pytest.approx(50.0)
     assert by_level[("sw3", "医疗设备")] == pytest.approx(25.0)
     assert rows[0]["as_of_date"] == date(2026, 3, 31)
+
+
+def test_valuation_only_skips_industry_weights() -> None:
+    from scheduled_tasks.jobs import sync_hongsehuojian_fill_validate as job
+
+    pe = {
+        "tracking_index_code": "399989.SZ",
+        "as_of_date": date(2026, 7, 17),
+        "current_pe_ttm": 26.0,
+        "pe_ttm_avg_5y": 20.0,
+        "pe_ttm_avg_10y": 18.0,
+        "source": "hongsehuojian",
+    }
+
+    with (
+        patch(
+            "scheduled_tasks.jobs.sync_hongsehuojian_fill_validate.load_settings",
+            return_value=MagicMock(database_url="postgresql://x"),
+        ),
+        patch(
+            "scheduled_tasks.jobs.sync_hongsehuojian_fill_validate.connect"
+        ) as connect_m,
+        patch(
+            "scheduled_tasks.jobs.sync_hongsehuojian_fill_validate.create_sync_run",
+            return_value=1,
+        ),
+        patch("scheduled_tasks.jobs.sync_hongsehuojian_fill_validate.finish_sync_run"),
+        patch("scheduled_tasks.jobs.sync_hongsehuojian_fill_validate.ensure_index_row"),
+        patch(
+            "scheduled_tasks.jobs.sync_hongsehuojian_fill_validate.fetch_index_pe_snapshot",
+            return_value=pe,
+        ),
+        patch(
+            "scheduled_tasks.jobs.sync_hongsehuojian_fill_validate.upsert_index_valuation_snapshot"
+        ) as upsert_pe,
+        patch(
+            "scheduled_tasks.jobs.sync_hongsehuojian_fill_validate.fetch_index_industry_weights"
+        ) as fetch_w,
+        patch(
+            "scheduled_tasks.jobs.sync_hongsehuojian_fill_validate.refresh_index_industry_weights"
+        ) as refresh_w,
+        patch(
+            "scheduled_tasks.jobs.sync_hongsehuojian_fill_validate.fetch_etf_daily_bundle"
+        ) as fetch_etf,
+    ):
+        connect_m.return_value = MagicMock()
+        out = job.run(mode="valuation-only")
+    assert out.status == "success"
+    upsert_pe.assert_called_once()
+    fetch_w.assert_not_called()
+    refresh_w.assert_not_called()
+    fetch_etf.assert_not_called()
+

@@ -33,9 +33,12 @@ GitHub Actions：workflow `应用驾驶舱 Migration`，勾选 `apply_rename_mig
 
 ```bash
 psql "$DATABASE_URL" -f src/scheduled_tasks/models/migrations/20260710_cockpit_ledger_and_fx_rates.sql
+psql "$DATABASE_URL" -f src/scheduled_tasks/models/migrations/20260718_etf_pool_authenticated_read.sql
 ```
 
-7. **清理废弃列/表**（旧库）：
+只读验证：`etf_pool` 已 `ENABLE ROW LEVEL SECURITY`，且存在 `etf_pool_select_authenticated`；`authenticated` 有 `SELECT`。
+
+7. **清理废弃列/表**（旧库；可重复执行）：
 
 ```bash
 psql "$DATABASE_URL" -f src/scheduled_tasks/models/migrations/20260717_drop_etf_daily_amount_columns.sql

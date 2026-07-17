@@ -5,9 +5,13 @@ from __future__ import annotations
 from datetime import date
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from scheduled_tasks.etf.csindex_client import fetch_index_daily_bars, to_csindex_code
 from scheduled_tasks.etf.sse_client import fetch_etf_daily_bars
+from scheduled_tasks.etf.yfinance_client import DEFAULT_HISTORY_START
 from scheduled_tasks.jobs.sync_official_cross_check import (
+    FULL_ETF_MAX_BARS,
     SyncSummary,
     compare_fields,
     cross_check_etf,
@@ -69,6 +73,31 @@ def test_csindex_fetch_maps_peg_to_pe() -> None:
     assert rows[0]["current_pe_ttm"] == 26.49
     assert "startDate=20260701" in captured[0]
     assert "endDate=20260717" in captured[0]
+
+
+def test_csindex_raises_on_bad_code_without_success_field() -> None:
+    with pytest.raises(RuntimeError, match="csindex index-perf failed"):
+        fetch_index_daily_bars(
+            "399989.SZ",
+            start=date(2026, 7, 1),
+            end=date(2026, 7, 17),
+            http_get_json=lambda _u: {"code": 500, "msg": "boom"},
+        )
+
+
+def test_csindex_raises_on_success_false() -> None:
+    with pytest.raises(RuntimeError, match="csindex index-perf failed"):
+        fetch_index_daily_bars(
+            "399989.SZ",
+            start=date(2026, 7, 1),
+            end=date(2026, 7, 17),
+            http_get_json=lambda _u: {
+                "code": "200",
+                "success": False,
+                "msg": "denied",
+                "data": [],
+            },
+        )
 
 
 def test_values_mismatch_semantics() -> None:
@@ -201,6 +230,20 @@ def test_main_mismatch_exits_nonzero() -> None:
 
 
 def test_from_pool_skips_szse_and_checks_sse() -> None:
+    sample_row = {
+        "etf_code": "512170",
+        "trade_date": date(2026, 7, 17),
+        "open": 0.3,
+        "high": 0.3,
+        "low": 0.3,
+        "close": 0.3,
+        "price_source": "sse",
+    }
+
+    def _cross(_conn, _code, _rows, *, epsilon, apply_official, summary):
+        del epsilon, apply_official
+        summary.etf_validated += 1
+
     with (
         patch(
             "scheduled_tasks.jobs.sync_official_cross_check.load_settings",
@@ -222,10 +265,11 @@ def test_from_pool_skips_szse_and_checks_sse() -> None:
         patch("scheduled_tasks.jobs.sync_official_cross_check.finish_sync_run"),
         patch(
             "scheduled_tasks.jobs.sync_official_cross_check.fetch_etf_daily_bars",
-            return_value=[],
+            return_value=[sample_row],
         ) as fetch_sse,
         patch(
-            "scheduled_tasks.jobs.sync_official_cross_check.cross_check_etf"
+            "scheduled_tasks.jobs.sync_official_cross_check.cross_check_etf",
+            side_effect=_cross,
         ) as cross_etf,
         patch(
             "scheduled_tasks.jobs.sync_official_cross_check.write_summary"
@@ -239,4 +283,105 @@ def test_from_pool_skips_szse_and_checks_sse() -> None:
     assert out.etf_codes_skipped_szse == ["159915"]
     assert fetch_sse.call_count == 2
     assert cross_etf.call_count == 2
+    assert out.etf_validated == 2
+    assert out.status == "success"
     assert out.index_validated == 0
+
+
+def test_empty_official_data_marks_failed() -> None:
+    with (
+        patch(
+            "scheduled_tasks.jobs.sync_official_cross_check.load_settings",
+            return_value=MagicMock(database_url="postgresql://x"),
+        ),
+        patch("scheduled_tasks.jobs.sync_official_cross_check.connect") as connect_m,
+        patch(
+            "scheduled_tasks.jobs.sync_official_cross_check.create_sync_run",
+            return_value=1,
+        ),
+        patch("scheduled_tasks.jobs.sync_official_cross_check.finish_sync_run"),
+        patch(
+            "scheduled_tasks.jobs.sync_official_cross_check.fetch_etf_daily_bars",
+            return_value=[],
+        ),
+        patch(
+            "scheduled_tasks.jobs.sync_official_cross_check.write_summary"
+        ),
+    ):
+        connect_m.return_value = MagicMock()
+        from scheduled_tasks.jobs.sync_official_cross_check import run
+
+        out = run(etf_code="512170", skip_index=True, lookback_bars=5)
+    assert out.status == "failed"
+    assert out.etf_validated == 0
+    assert any("empty kline" in e for e in out.source_errors)
+
+
+def test_full_mode_uses_deep_history_windows() -> None:
+    sample_etf = [
+        {
+            "etf_code": "510300",
+            "trade_date": date(2026, 7, 17),
+            "open": 1.0,
+            "high": 1.0,
+            "low": 1.0,
+            "close": 1.0,
+            "price_source": "sse",
+        }
+    ]
+    sample_idx = [
+        {
+            "index_code": "399989.SZ",
+            "trade_date": date(2026, 7, 17),
+            "close": 100.0,
+            "current_pe_ttm": 20.0,
+            "price_source": "csindex",
+        }
+    ]
+
+    def _cross_etf(_conn, _code, _rows, *, epsilon, apply_official, summary):
+        del epsilon, apply_official
+        summary.etf_validated += 1
+
+    def _cross_idx(_conn, _code, _rows, *, epsilon, pe_epsilon, apply_official, summary):
+        del epsilon, pe_epsilon, apply_official
+        summary.index_validated += 1
+        summary.valuation_validated += 1
+
+    with (
+        patch(
+            "scheduled_tasks.jobs.sync_official_cross_check.load_settings",
+            return_value=MagicMock(database_url="postgresql://x"),
+        ),
+        patch("scheduled_tasks.jobs.sync_official_cross_check.connect") as connect_m,
+        patch(
+            "scheduled_tasks.jobs.sync_official_cross_check.create_sync_run",
+            return_value=1,
+        ),
+        patch("scheduled_tasks.jobs.sync_official_cross_check.finish_sync_run"),
+        patch(
+            "scheduled_tasks.jobs.sync_official_cross_check.fetch_etf_daily_bars",
+            return_value=sample_etf,
+        ) as fetch_sse,
+        patch(
+            "scheduled_tasks.jobs.sync_official_cross_check.fetch_index_daily_bars",
+            return_value=sample_idx,
+        ) as fetch_idx,
+        patch(
+            "scheduled_tasks.jobs.sync_official_cross_check.cross_check_etf",
+            side_effect=_cross_etf,
+        ),
+        patch(
+            "scheduled_tasks.jobs.sync_official_cross_check.cross_check_index",
+            side_effect=_cross_idx,
+        ),
+        patch("scheduled_tasks.jobs.sync_official_cross_check.write_summary"),
+    ):
+        connect_m.return_value = MagicMock()
+        from scheduled_tasks.jobs.sync_official_cross_check import run
+
+        out = run(etf_code="510300", mode="full", end=date(2026, 7, 17))
+    assert out.status == "success"
+    assert fetch_sse.call_args.kwargs["max_bars"] == FULL_ETF_MAX_BARS
+    assert fetch_idx.call_args.kwargs["start"] == DEFAULT_HISTORY_START
+    assert fetch_idx.call_args.kwargs["end"] == date(2026, 7, 17)
