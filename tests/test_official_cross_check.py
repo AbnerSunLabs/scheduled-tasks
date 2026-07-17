@@ -178,6 +178,28 @@ def test_main_requires_yes_for_apply() -> None:
     assert main(["--apply-official"]) == 2
 
 
+def test_main_source_error_without_mismatch_exits_zero() -> None:
+    summary = SyncSummary(
+        status="partial",
+        etf_validated=10,
+        source_errors=["sse:510050:Remote end closed connection without response"],
+    )
+    with patch(
+        "scheduled_tasks.jobs.sync_official_cross_check.run",
+        return_value=summary,
+    ):
+        assert main(["--from-pool"]) == 0
+
+
+def test_main_mismatch_exits_nonzero() -> None:
+    summary = SyncSummary(status="partial", etf_validated=10, etf_mismatch_count=1)
+    with patch(
+        "scheduled_tasks.jobs.sync_official_cross_check.run",
+        return_value=summary,
+    ):
+        assert main(["--from-pool"]) == 1
+
+
 def test_from_pool_skips_szse_and_checks_sse() -> None:
     with (
         patch(

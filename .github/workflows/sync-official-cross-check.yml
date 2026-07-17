@@ -146,7 +146,13 @@ jobs:
           )"
             case "$status" in
               success) title="官网校验通过" ;;
-              partial) title="官网校验发现差异" ;;
+              partial)
+                if [ "${etf_mismatch:-0}" != "0" ]; then
+                  title="官网校验发现价差"
+                else
+                  title="官网校验部分源失败"
+                fi
+                ;;
               *) title="官网校验失败" ;;
             esac
             body="job=sync_official_cross_check status=${status} from_pool=${from_pool} checked=${etf_checked} validated=${etf_validated} mismatch=${etf_mismatch} skipped_szse=${skipped_szse}

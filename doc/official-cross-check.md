@@ -47,4 +47,5 @@ Workflow：`.github/workflows/sync-official-cross-check.yml`
 - 定时：工作日北京约 20:00（ETF 日 K 之后），默认 `--from-pool` **只比对**
 - 手动：`workflow_dispatch` 可改 mode / from_pool / etf_code
 - **不会**自动 `--apply-official`；纠偏需本地显式确认
+- 退出码：仅 **价差 mismatch** 或整次失败 → 非 0；个别源瞬时断连但已有有效比对 → 0（summary 仍可能 `partial`）
 - 结果经 Bark（若配置 `BARK_KEY`）推送；summary 上传 artifact

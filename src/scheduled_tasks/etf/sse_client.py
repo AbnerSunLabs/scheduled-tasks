@@ -10,6 +10,8 @@ from __future__ import annotations
 
 import json
 import ssl
+import time
+import urllib.error
 import urllib.request
 from collections.abc import Callable
 from datetime import date, datetime
@@ -40,22 +42,50 @@ def _ssl_context() -> ssl.SSLContext:
     return ssl.create_default_context(cafile=certifi.where())
 
 
+def retry_call(
+    fn: Callable[[], T],
+    *,
+    attempts: int = 4,
+    base_delay_sec: float = 1.5,
+) -> T:
+    last_error: BaseException | None = None
+    for i in range(attempts):
+        try:
+            return fn()
+        except Exception as error:  # noqa: BLE001
+            last_error = error
+            if i + 1 >= attempts:
+                break
+            time.sleep(base_delay_sec * (i + 1))
+    assert last_error is not None
+    raise last_error
+
+
 def _http_get_json(url: str, *, timeout: float = 60.0) -> dict[str, Any]:
-    req = urllib.request.Request(
-        url,
-        headers={
-            "Accept": "application/json",
-            "User-Agent": USER_AGENT,
-            "Referer": "https://www.sse.com.cn/",
-        },
-        method="GET",
-    )
-    # yunhq 日 K 目前仅提供 http；https 会 SSL 失败
-    kwargs: dict[str, Any] = {"timeout": timeout}
-    if url.startswith("https://"):
-        kwargs["context"] = _ssl_context()
-    with urllib.request.urlopen(req, **kwargs) as resp:
-        return json.loads(resp.read().decode("utf-8"))
+    def _do() -> dict[str, Any]:
+        req = urllib.request.Request(
+            url,
+            headers={
+                "Accept": "application/json",
+                "User-Agent": USER_AGENT,
+                "Referer": "https://www.sse.com.cn/",
+                "Connection": "close",
+            },
+            method="GET",
+        )
+        # yunhq 日 K 目前仅提供 http；https 会 SSL 失败
+        kwargs: dict[str, Any] = {"timeout": timeout}
+        if url.startswith("https://"):
+            kwargs["context"] = _ssl_context()
+        try:
+            with urllib.request.urlopen(req, **kwargs) as resp:
+                return json.loads(resp.read().decode("utf-8"))
+        except urllib.error.HTTPError as exc:
+            raise RuntimeError(f"sse http {exc.code} for {url}") from exc
+        except (urllib.error.URLError, TimeoutError, ConnectionError) as exc:
+            raise RuntimeError(f"sse network error: {exc}") from exc
+
+    return retry_call(_do)
 
 
 def fetch_etf_daily_bars(
