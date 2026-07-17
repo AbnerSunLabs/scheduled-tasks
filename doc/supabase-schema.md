@@ -181,7 +181,7 @@ erDiagram
 
 > 原名 `etf_pool_snapshots`（2026-07-15 更名）。主键仅为 `etf_code` → **当前池**（每标的一行），**不是**按日多版本历史快照。读池必须 **全表直读**，禁止 `where snapshot_date = max(...)`。列名 `snapshot_date` 表示「元数据最近刷新日」，非快照版本键。
 >
-> `tracking_index_code` 回填见 `migrations/20260716_backfill_etf_pool_tracking_index.sql`（job 仍只读本表；元数据补齐用迁移/SQL）。池组成调整见 `migrations/20260717_etf_pool_replace_medical_drop_metals_nev.sql`（医疗 `159828`→`512170`；出池有色/新能源车/稀有金属相关标的；当前池断言 **21** 只）。出池标的关联行情清理见 `migrations/20260717_purge_removed_etf_related_data.sql`（`etf_daily` + 仅其使用的 `indices` / `etf_valuation`）。H 开头 CSI 与海外指数可写 `etf_pool`，但受 `indices.code` 格式约束，不能进 `indices` 白名单。
+> `tracking_index_code` 回填见 `migrations/20260716_backfill_etf_pool_tracking_index.sql`（job 仍只读本表；元数据补齐用迁移/SQL）。池组成调整见 `migrations/20260717_etf_pool_replace_medical_drop_metals_nev.sql`（医疗 `159828`→`512170`；出池有色/新能源车/稀有金属相关标的）与 `migrations/20260718_drop_sse50_etf_510050.sql`（出池上证50 ETF `510050` 并清理 `000016.SH`；当前池断言 **20** 只）。出池标的关联行情清理见 `migrations/20260717_purge_removed_etf_related_data.sql`（`etf_daily` + 仅其使用的 `indices` / `etf_valuation`）。H 开头 CSI 与海外指数可写 `etf_pool`，但受 `indices.code` 格式约束，不能进 `indices` 白名单。
 
 | 列名                    | 类型          | 约束                         | 说明                                   |
 | ----------------------- | ------------- | ---------------------------- | -------------------------------------- |
@@ -321,11 +321,14 @@ psql "$DATABASE_URL" -f src/scheduled_tasks/models/migrations/20260716_backfill_
 # 表/列中文注释（幂等；Dashboard 列 Description 可见）
 psql "$DATABASE_URL" -f src/scheduled_tasks/models/migrations/20260716_add_chinese_comments.sql
 
-# 池组成调整（医疗 159828→512170 等；断言 21 只）
+# 池组成调整（医疗 159828→512170 等）
 psql "$DATABASE_URL" -f src/scheduled_tasks/models/migrations/20260717_etf_pool_replace_medical_drop_metals_nev.sql
 
 # 出池标的关联行情清理
 psql "$DATABASE_URL" -f src/scheduled_tasks/models/migrations/20260717_purge_removed_etf_related_data.sql
+
+# 出池上证50 ETF 510050 + 清理独占指数 000016.SH（断言 20 只）
+psql "$DATABASE_URL" -f src/scheduled_tasks/models/migrations/20260718_drop_sse50_etf_510050.sql
 
 # 删除 index_daily_valuations；重建指数视图挂估值表
 # （新库若已跑最新 schema.sql 则无需；旧库必跑；须在 rename_drop_snapshots 之前）

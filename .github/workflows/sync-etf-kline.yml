@@ -19,7 +19,7 @@ on:
           - full
         default: incremental
       codes:
-        description: "可选：逗号分隔 6 位 ETF 代码（跳过 21 只断言）"
+        description: "可选：逗号分隔 6 位 ETF 代码（跳过 20 只断言）"
         required: false
         type: string
       force:
