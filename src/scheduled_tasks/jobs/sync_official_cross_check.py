@@ -394,6 +394,7 @@ def run(
             },
         )
 
+        failed_codes: set[str] = set()
         for idx, code in enumerate(etf_codes):
             try:
                 etf_rows = fetch_etf_daily_bars(code, max_bars=etf_bars)
@@ -410,6 +411,7 @@ def run(
             except Exception as exc:  # noqa: BLE001
                 summary.source_errors.append(f"sse:{code}:{exc}")
                 summary.failure_count += 1
+                failed_codes.add(code)
             if idx + 1 < len(etf_codes):
                 time.sleep(INTER_SYMBOL_DELAY_SEC)
 
@@ -443,6 +445,7 @@ def run(
             except Exception as exc:  # noqa: BLE001
                 summary.source_errors.append(f"csindex:{exc}")
                 summary.failure_count += 1
+                failed_codes.add(index_code)
 
         mismatch_total = (
             summary.etf_mismatch_count
@@ -492,7 +495,11 @@ def run(
                     "error": "no rows validated",
                 }
             ]
-        success_codes = [] if summary.status == "failed" else list(tracked_codes)
+        # partial 时排除源失败标的，避免 sync_runs.success_codes 虚高
+        if summary.status == "failed":
+            success_codes: list[str] = []
+        else:
+            success_codes = [c for c in tracked_codes if c not in failed_codes]
         finish_sync_run(
             conn,
             run_id,

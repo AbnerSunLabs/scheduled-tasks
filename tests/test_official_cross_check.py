@@ -288,6 +288,69 @@ def test_from_pool_skips_szse_and_checks_sse() -> None:
     assert out.index_validated == 0
 
 
+def test_partial_excludes_failed_codes_from_success_codes() -> None:
+    sample_row = {
+        "etf_code": "512170",
+        "trade_date": date(2026, 7, 17),
+        "open": 0.3,
+        "high": 0.3,
+        "low": 0.3,
+        "close": 0.3,
+        "price_source": "sse",
+    }
+
+    def _fetch(code: str, *, max_bars: int):
+        del max_bars
+        if code == "510300":
+            raise RuntimeError("connection reset")
+        return [sample_row]
+
+    def _cross(_conn, _code, _rows, *, epsilon, apply_official, summary):
+        del epsilon, apply_official
+        summary.etf_validated += 1
+
+    finish = MagicMock()
+    with (
+        patch(
+            "scheduled_tasks.jobs.sync_official_cross_check.load_settings",
+            return_value=MagicMock(database_url="postgresql://x"),
+        ),
+        patch("scheduled_tasks.jobs.sync_official_cross_check.connect") as connect_m,
+        patch(
+            "scheduled_tasks.jobs.sync_official_cross_check.fetch_etf_pool",
+            return_value=[
+                {"etf_code": "512170"},
+                {"etf_code": "510300"},
+            ],
+        ),
+        patch(
+            "scheduled_tasks.jobs.sync_official_cross_check.create_sync_run",
+            return_value=1,
+        ),
+        patch(
+            "scheduled_tasks.jobs.sync_official_cross_check.finish_sync_run",
+            finish,
+        ),
+        patch(
+            "scheduled_tasks.jobs.sync_official_cross_check.fetch_etf_daily_bars",
+            side_effect=_fetch,
+        ),
+        patch(
+            "scheduled_tasks.jobs.sync_official_cross_check.cross_check_etf",
+            side_effect=_cross,
+        ),
+        patch("scheduled_tasks.jobs.sync_official_cross_check.write_summary"),
+    ):
+        connect_m.return_value = MagicMock()
+        from scheduled_tasks.jobs.sync_official_cross_check import run
+
+        out = run(from_pool=True, skip_index=True, lookback_bars=5)
+    assert out.status == "partial"
+    assert any("510300" in e for e in out.source_errors)
+    finish.assert_called_once()
+    assert finish.call_args.kwargs["success_codes"] == ["512170"]
+
+
 def test_empty_official_data_marks_failed() -> None:
     with (
         patch(
