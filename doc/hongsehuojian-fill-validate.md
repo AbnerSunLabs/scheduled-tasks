@@ -33,10 +33,10 @@
 
 - `etf_daily`：`price_source='hongsehuojian'`（仅新行；不含成交额）
 - `indices`：缺则插入元数据（`ON CONFLICT DO NOTHING`）
-- `index_daily_prices`：仅新行
 - `etf_valuation`：`tracking_index_code` 主键，刷新当日 PE / 5y / 10y 均值
 - `index_industry_weights`：红色火箭主源，按指数删旧写新（最新一期 sw1/sw2/sw3）
 - `sync_runs`：`job_name=sync_hongsehuojian_fill_validate`
+- 估值：红色火箭对池内可解析指数刷 `etf_valuation`。实测：**境内数字码 + `*.HI`（恒生/恒生科技）有 PE**；`H*.CSI` 半导体/中概互联/机器人、以及 `NDX.NASDAQ` / `SPX.OTH` 接口无估值数据，写不了。
 
 ## 本地运行
 

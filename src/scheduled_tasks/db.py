@@ -450,28 +450,6 @@ def update_etf_daily_ohlc_official(
     return len(values)
 
 
-def update_index_daily_close_official(
-    conn: Connection[dict[str, Any]],
-    rows: Iterable[dict[str, Any]],
-) -> int:
-    """官网纠偏：仅 UPDATE 已有行的指数收盘价。"""
-    values = list(rows)
-    if not values:
-        return 0
-    with conn.cursor() as cur:
-        cur.executemany(
-            """
-            update public.index_daily_prices
-            set close = %(close)s,
-                updated_at = now()
-            where index_code = %(index_code)s
-              and trade_date = %(trade_date)s
-            """,
-            values,
-        )
-    return len(values)
-
-
 def update_etf_valuation_pe_official(
     conn: Connection[dict[str, Any]],
     *,
@@ -604,48 +582,6 @@ def ensure_index_row(
             """,
             (code, name, category, display_order),
         )
-
-
-def fetch_index_daily_prices(
-    conn: Connection[dict[str, Any]],
-    index_code: str,
-    trade_dates: Sequence[date],
-) -> dict[date, dict[str, Any]]:
-    if not trade_dates:
-        return {}
-    with conn.cursor() as cur:
-        cur.execute(
-            """
-            select index_code, trade_date, close
-            from public.index_daily_prices
-            where index_code = %s
-              and trade_date = any(%s)
-            """,
-            (index_code, list(trade_dates)),
-        )
-        return {row["trade_date"]: dict(row) for row in cur.fetchall()}
-
-
-def insert_index_daily_prices_ignore_conflict(
-    conn: Connection[dict[str, Any]],
-    rows: Iterable[dict[str, Any]],
-) -> int:
-    values = list(rows)
-    if not values:
-        return 0
-    with conn.cursor() as cur:
-        cur.executemany(
-            """
-            insert into public.index_daily_prices (
-              index_code, trade_date, close, updated_at
-            ) values (
-              %(index_code)s, %(trade_date)s, %(close)s, now()
-            )
-            on conflict (index_code, trade_date) do nothing
-            """,
-            values,
-        )
-    return len(values)
 
 
 def fetch_etf_valuation_snapshot(

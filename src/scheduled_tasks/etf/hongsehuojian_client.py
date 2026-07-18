@@ -35,7 +35,7 @@ USER_AGENT = "scheduled-tasks-hongsehuojian/1.0"
 def to_security_code(code: str, *, kind: str) -> str:
     """库内代码 → 红色火箭 securityCode。
 
-    kind: ``etf``（六位数字）或 ``index``（已带 .SH/.SZ/.CSI）。
+    kind: ``etf``（六位数字）或 ``index``（``*.SH|SZ|CSI|HI|NASDAQ|OTH``）。
     """
     raw = code.strip().upper()
     if kind == "etf":
@@ -50,7 +50,13 @@ def to_security_code(code: str, *, kind: str) -> str:
         if raw.count(".") != 1:
             raise ValueError(f"invalid index_code: {code}")
         left, suffix = raw.split(".", 1)
-        if len(left) != 6 or not left.isdigit() or suffix not in {"SH", "SZ", "CSI"}:
+        if not left or len(left) > 12 or suffix not in {"SH", "SZ", "CSI", "HI", "NASDAQ", "OTH"}:
+            raise ValueError(f"invalid index_code: {code}")
+        # 境内/中证数字码；跨境 H 前缀 CSI；港股 HI；美股 NASDAQ/OTH
+        if left.isdigit():
+            if len(left) != 6:
+                raise ValueError(f"invalid index_code: {code}")
+        elif not left.isalnum():
             raise ValueError(f"invalid index_code: {code}")
         return f"{left}.{suffix}"
     raise ValueError(f"unsupported kind: {kind}")
@@ -316,7 +322,7 @@ def fetch_index_daily_prices(
     max_bars: int | None = None,
     base_url: str = DEFAULT_BASE_URL,
 ) -> list[dict[str, Any]]:
-    """指数日收盘 → index_daily_prices 行。"""
+    """拉取指数日收盘（远程）；库表已删除，仅供临时探查。"""
     security = to_security_code(index_code, kind="index")
     rows = fetch_kline_history(
         security, adjust=ADJUST_NONE, end=end, max_bars=max_bars, base_url=base_url

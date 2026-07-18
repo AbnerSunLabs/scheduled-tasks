@@ -7,22 +7,9 @@ create table if not exists indices (
   display_order integer not null,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
-  constraint indices_code_format check (code ~ '^[0-9]{6}\.(SH|SZ|CSI)$'),
+  constraint indices_code_format check (code ~ '^[A-Z0-9]{2,12}\.(SH|SZ|CSI|HI|NASDAQ|OTH)$'),
   constraint indices_category_not_blank check (length(trim(category)) > 0)
 );
-
-create table if not exists index_daily_prices (
-  index_code text not null references indices(code) on delete cascade,
-  trade_date date not null,
-  close numeric(18, 4) not null,
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now(),
-  primary key (index_code, trade_date),
-  constraint index_daily_prices_close_positive check (close > 0)
-);
-
-create index if not exists idx_index_daily_prices_trade_date
-  on index_daily_prices (trade_date desc);
 
 create table if not exists index_industry_weights (
   index_code text not null references indices(code) on delete cascade,
@@ -61,7 +48,7 @@ create index if not exists idx_sync_runs_started_at
   on sync_runs (started_at desc);
 
 -- ETF 表：索引命名沿用线上 Supabase 默认风格（后缀 _idx），与指数表 idx_ 前缀不同。
--- 指数相关表/视图：全市场 sync 已停；demo 可用红色火箭对 allowlist 补缺（见 sync_hongsehuojian_fill_validate）。
+-- 指数相关：无日线表；红色火箭可写估值 / 行业权重（见 sync_hongsehuojian_fill_validate）。
 -- 本仓库主写 etf_daily，只读 etf_pool（当前池主数据）。
 create table if not exists etf_pool (
   etf_code text primary key,
@@ -147,35 +134,17 @@ create index if not exists fx_rates_rate_date_idx
 -- 用户账本 12 表（依赖 auth.users）不放本文件，见：
 -- models/migrations/20260710_cockpit_ledger_and_fx_rates.sql
 
--- 以下指数视图依赖基表；估值改走 etf_valuation（无日估值表）。
+-- 指数视图：日线表已删除；收盘相关列固定为 null，估值挂 etf_valuation。
 create or replace view index_latest_snapshot as
-with latest_price as (
-  select distinct on (index_code)
-    index_code,
-    trade_date,
-    close
-  from index_daily_prices
-  order by index_code, trade_date desc
-),
-history_high as (
-  select
-    index_code,
-    max(close) as history_high
-  from index_daily_prices
-  group by index_code
-)
 select
   i.code,
   i.name,
   i.category,
   i.display_order,
-  p.trade_date as as_of_date,
-  p.close,
-  h.history_high,
-  case
-    when p.close is null or h.history_high is null or h.history_high <= 0 then null
-    else round(((p.close / h.history_high - 1) * 100)::numeric, 1)
-  end as drawdown_from_high_pct,
+  null::date as as_of_date,
+  null::numeric as close,
+  null::numeric as history_high,
+  null::numeric as drawdown_from_high_pct,
   s.current_pe_ttm as pe_ttm,
   null::numeric as pe_percentile_current,
   null::numeric as percentile_5y_pe,
@@ -188,8 +157,6 @@ select
   s.pe_ttm_avg_10y,
   s.trade_date as valuation_as_of_date
 from indices i
-left join latest_price p on p.index_code = i.code
-left join history_high h on h.index_code = i.code
 left join etf_valuation s on s.tracking_index_code = i.code
 order by i.display_order;
 
@@ -199,11 +166,7 @@ select
   i.name,
   i.category,
   i.display_order,
-  (
-    select max(trade_date)
-    from index_daily_prices p
-    where p.index_code = i.code
-  ) as latest_price_date,
+  null::date as latest_price_date,
   (
     select s.trade_date
     from etf_valuation s

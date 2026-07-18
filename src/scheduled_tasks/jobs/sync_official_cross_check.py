@@ -1,7 +1,8 @@
-"""官网双源校验：上交所 ETF + 中证指数 vs 库内主写。
+"""官网双源校验：上交所 ETF + 中证估值 vs 库内主写。
 
 默认只比对、不写库；``--apply-official`` 才对 mismatch 行 UPDATE。
 缺日不 INSERT（补缺仍归 yfinance / 红色火箭）。
+指数日线表已删除：指数侧仅校验 ``etf_valuation.current_pe_ttm``。
 """
 
 from __future__ import annotations
@@ -22,11 +23,9 @@ from scheduled_tasks.db import (
     fetch_etf_daily_rows,
     fetch_etf_pool,
     fetch_etf_valuation_snapshot,
-    fetch_index_daily_prices,
     finish_sync_run,
     update_etf_daily_ohlc_official,
     update_etf_valuation_pe_official,
-    update_index_daily_close_official,
 )
 from scheduled_tasks.etf.csindex_client import (
     fetch_index_daily_bars,
@@ -211,55 +210,12 @@ def cross_check_index(
     apply_official: bool,
     summary: SyncSummary,
 ) -> None:
+    """指数侧仅校验估值 PE（日线表已删除，不再比对 close）。"""
+    del epsilon
     summary.index_official_fetched = len(official_rows)
     if not official_rows:
         return
-    dates = [r["trade_date"] for r in official_rows]
-    db_by_date = fetch_index_daily_prices(conn, index_code, dates)
-    to_apply: list[dict[str, Any]] = []
-    for remote in official_rows:
-        td = remote["trade_date"]
-        db_row = db_by_date.get(td)
-        if db_row is None:
-            summary.index_missing_in_db += 1
-            continue
-        summary.index_validated += 1
-        # 中证官网 close 通常两位小数；库内可能有更高精度噪声
-        db_close = db_row.get("close")
-        off_close = remote.get("close")
-        db_cmp = None if db_close is None else round(float(db_close), 2)
-        off_cmp = None if off_close is None else round(float(off_close), 2)
-        if values_mismatch(db_cmp, off_cmp, epsilon=epsilon):
-            summary.index_mismatch_count += 1
-            _append_mismatch(
-                summary,
-                {
-                    "kind": "index_daily_prices",
-                    "index_code": index_code,
-                    "trade_date": td.isoformat(),
-                    "diffs": [
-                        {
-                            "field": "close",
-                            "db": _jsonable_num(db_close),
-                            "official": _jsonable_num(off_close),
-                            "db_rounded": db_cmp,
-                            "official_rounded": off_cmp,
-                        }
-                    ],
-                },
-            )
-            if apply_official:
-                to_apply.append(
-                    {
-                        "index_code": index_code,
-                        "trade_date": td,
-                        "close": remote["close"],
-                    }
-                )
-    if apply_official and to_apply:
-        summary.index_applied = update_index_daily_close_official(conn, to_apply)
 
-    # 估值：用官网窗口最新一日 PE vs 快照
     latest_with_pe = next(
         (r for r in reversed(official_rows) if r.get("current_pe_ttm") is not None),
         None,

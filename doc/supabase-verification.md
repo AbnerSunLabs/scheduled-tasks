@@ -53,7 +53,6 @@ psql "$DATABASE_URL" -f src/scheduled_tasks/models/migrations/20260716_add_chine
 
 9. Confirm these tables exist:
    - `indices`（红色火箭可 ensure）
-   - `index_daily_prices`（红色火箭补缺）
    - `index_industry_weights`（红色火箭主写）
    - `sync_runs`（含 `meta jsonb`）
    - `etf_pool`
@@ -61,6 +60,7 @@ psql "$DATABASE_URL" -f src/scheduled_tasks/models/migrations/20260716_add_chine
    - `etf_valuation`（红色火箭可写）
    - `fx_rates`（`rate_date` + 货币对 PK；Frankfurter）
    - 账本 12 表（DDL only；见 `20260710_cockpit_ledger_and_fx_rates.sql`）
+   - 确认 **不存在** `index_daily_prices`（`20260718_drop_index_daily_prices.sql`）
    - 确认 **不存在** `index_daily_valuations`（已由 `20260717_drop_index_daily_valuations.sql` 删除）
    - 确认 **不存在** `trade_calendar`（`20260717_drop_trade_calendar.sql`）
    - 确认 `etf_daily` **无** `amount` / `amount_source` / `amount_updated_at`（`20260717_drop_etf_daily_amount_columns.sql`）
@@ -143,7 +143,7 @@ from etf_daily;
 select count(*) as pool_size
 from etf_pool
 where etf_code not in ('512660', '159992');
--- 期望：20（排除历史黑名单后与 EXPECTED_POOL_SIZE 一致）
+-- 期望：18（排除历史黑名单后与 EXPECTED_POOL_SIZE 一致）
 ```
 
 ```sql

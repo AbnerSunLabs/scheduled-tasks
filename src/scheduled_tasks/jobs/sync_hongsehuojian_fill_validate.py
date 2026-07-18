@@ -1,9 +1,10 @@
-"""从红色火箭补缺 + 校验 ETF/指数日数据（默认标的：医疗 ETF + 中证医疗）。
+"""从红色火箭补缺 + 校验 ETF（默认标的：医疗 ETF + 中证医疗）。
 
 写入语义：
-- ETF / 指数收盘价：缺失 (code, trade_date) → INSERT；已有行只比对不 UPDATE
+- ETF：缺失 (code, trade_date) → INSERT；已有行只比对不 UPDATE
 - 指数估值：写入 ``etf_valuation``（当日 PE + 5y/10y 均值），按指数 upsert 刷新
 - 行业权重：红色火箭主源刷新 ``index_industry_weights``（删旧写新）
+- 指数日线表已删除，不再写 ``index_daily_prices``
 """
 
 from __future__ import annotations
@@ -25,16 +26,13 @@ from scheduled_tasks.db import (
     existing_trade_dates,
     fetch_etf_daily_rows,
     fetch_etf_valuation_snapshot,
-    fetch_index_daily_prices,
     finish_sync_run,
     insert_etf_daily_bars_ignore_conflict,
-    insert_index_daily_prices_ignore_conflict,
     replace_index_industry_weights,
     upsert_etf_valuation_snapshot,
 )
 from scheduled_tasks.etf.hongsehuojian_client import (
     fetch_etf_daily_bundle,
-    fetch_index_daily_prices as fetch_remote_index_prices,
     fetch_index_industry_weights,
     fetch_index_pe_snapshot,
 )
@@ -224,52 +222,6 @@ def fill_and_validate_etf(
             )
 
 
-def fill_and_validate_index_prices(
-    conn: Any,
-    index_code: str,
-    remote_rows: list[dict[str, Any]],
-    *,
-    epsilon: float,
-    summary: SyncSummary,
-) -> None:
-    if not remote_rows:
-        raise RuntimeError(f"empty remote index prices for {index_code}")
-    summary.index_price_fetched = len(remote_rows)
-    dates = [row["trade_date"] for row in remote_rows]
-    existing_map = fetch_index_daily_prices(conn, index_code, dates)
-    existing = set(existing_map)
-    to_fill = [row for row in remote_rows if row["trade_date"] not in existing]
-    to_validate = [row for row in remote_rows if row["trade_date"] in existing]
-
-    if to_fill:
-        insert_index_daily_prices_ignore_conflict(conn, to_fill)
-        summary.index_price_filled = len(to_fill)
-
-    summary.index_price_validated = len(to_validate)
-    for remote in to_validate:
-        td = remote["trade_date"]
-        db_row = existing_map.get(td)
-        if db_row is None:
-            continue
-        if values_mismatch(db_row.get("close"), remote.get("close"), epsilon=epsilon):
-            summary.index_price_mismatch_count += 1
-            if len(summary.mismatches) < MAX_MISMATCH_SAMPLES:
-                summary.mismatches.append(
-                    {
-                        "kind": "index_daily_prices",
-                        "code": index_code,
-                        "trade_date": td.isoformat(),
-                        "diffs": [
-                            {
-                                "field": "close",
-                                "db": _as_float(db_row.get("close")),
-                                "remote": _as_float(remote.get("close")),
-                            }
-                        ],
-                    }
-                )
-
-
 def upsert_index_valuation_snapshot(
     conn: Any,
     index_code: str,
@@ -365,13 +317,6 @@ def run(
         if mode != "valuation-only":
             remote_etf = fetch_etf_daily_bundle(etf_code, end=end, max_bars=max_bars)
             fill_and_validate_etf(conn, etf_code, remote_etf, epsilon=epsilon, summary=summary)
-
-            remote_prices = fetch_remote_index_prices(
-                index_code, end=end, max_bars=max_bars
-            )
-            fill_and_validate_index_prices(
-                conn, index_code, remote_prices, epsilon=epsilon, summary=summary
-            )
 
             remote_weights = fetch_index_industry_weights(index_code)
             refresh_index_industry_weights(

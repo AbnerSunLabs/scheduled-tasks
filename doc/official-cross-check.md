@@ -10,7 +10,7 @@
 |------|------|--------|
 | ETF `5xxxxx`（上交所） | 上交所 yunhq 日 K | `etf_daily` OHLC |
 | ETF `15xxxx`（深交所） | **暂无**官网 client（`--from-pool` 会跳过） | — |
-| 指数（可选） | 中证 `index-perf` | `index_daily_prices.close` + `etf_valuation.current_pe_ttm` |
+| 指数（可选） | 中证 `index-perf` | 仅 `etf_valuation.current_pe_ttm`（日线表已删除） |
 
 ## 行为
 

@@ -25,10 +25,17 @@ def test_to_security_code_etf_and_index() -> None:
     assert to_security_code("512170", kind="etf") == "512170.SH"
     assert to_security_code("159828", kind="etf") == "159828.SZ"
     assert to_security_code("399989.SZ", kind="index") == "399989.SZ"
+    assert to_security_code("HSI.HI", kind="index") == "HSI.HI"
+    assert to_security_code("HSTECH.HI", kind="index") == "HSTECH.HI"
+    assert to_security_code("H30184.CSI", kind="index") == "H30184.CSI"
+    assert to_security_code("NDX.NASDAQ", kind="index") == "NDX.NASDAQ"
+    assert to_security_code("SPX.OTH", kind="index") == "SPX.OTH"
     with pytest.raises(ValueError):
         to_security_code("600000", kind="etf")
     with pytest.raises(ValueError):
         to_security_code("399989", kind="index")
+    with pytest.raises(ValueError):
+        to_security_code("HSI.HK", kind="index")
 
 
 def test_parse_trade_date_formats() -> None:

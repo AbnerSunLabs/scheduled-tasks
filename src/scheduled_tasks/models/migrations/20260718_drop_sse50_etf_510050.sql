@@ -1,5 +1,5 @@
 -- 出池并清理上证50 ETF（510050）及其独占跟踪指数 000016.SH（幂等）。
--- 删除 indices 时 ON DELETE CASCADE 会清 index_daily_prices / index_industry_weights（若存在 FK）。
+-- 删除 indices 时 ON DELETE CASCADE 会清 index_industry_weights（若存在 FK）。
 
 begin;
 
