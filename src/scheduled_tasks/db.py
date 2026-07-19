@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import re
 from collections.abc import Iterable, Sequence
-from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from typing import Any
 from urllib.parse import parse_qsl, quote, unquote, urlencode
@@ -450,7 +449,7 @@ def update_etf_daily_ohlc_official(
     return len(values)
 
 
-def update_etf_valuation_pe_official(
+def update_index_valuation_pe_official(
     conn: Connection[dict[str, Any]],
     *,
     tracking_index_code: str,
@@ -461,7 +460,7 @@ def update_etf_valuation_pe_official(
     with conn.cursor() as cur:
         cur.execute(
             """
-            update public.etf_valuation
+            update public.index_valuation
             set current_pe_ttm = %s,
                 trade_date = %s,
                 updated_at = now()
@@ -584,7 +583,7 @@ def ensure_index_row(
         )
 
 
-def fetch_etf_valuation_snapshot(
+def fetch_index_valuation(
     conn: Connection[dict[str, Any]],
     tracking_index_code: str,
 ) -> dict[str, Any] | None:
@@ -594,7 +593,7 @@ def fetch_etf_valuation_snapshot(
             select
               tracking_index_code, trade_date,
               current_pe_ttm, pe_ttm_avg_5y, pe_ttm_avg_10y, updated_at
-            from public.etf_valuation
+            from public.index_valuation
             where tracking_index_code = %s
             """,
             (tracking_index_code,),
@@ -603,7 +602,7 @@ def fetch_etf_valuation_snapshot(
     return dict(row) if row else None
 
 
-def upsert_etf_valuation_snapshot(
+def upsert_index_valuation(
     conn: Connection[dict[str, Any]],
     row: dict[str, Any],
 ) -> None:
@@ -611,7 +610,7 @@ def upsert_etf_valuation_snapshot(
     with conn.cursor() as cur:
         cur.execute(
             """
-            insert into public.etf_valuation (
+            insert into public.index_valuation (
               tracking_index_code, trade_date,
               current_pe_ttm, pe_ttm_avg_5y, pe_ttm_avg_10y, updated_at
             ) values (

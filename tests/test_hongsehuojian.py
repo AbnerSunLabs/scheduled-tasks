@@ -8,11 +8,11 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from scheduled_tasks.etf.hongsehuojian_client import (
+    _mean_positive_valuations,
     build_etf_daily_rows,
     parse_kline_items,
     parse_trade_date,
     to_security_code,
-    _mean_positive_valuations,
 )
 from scheduled_tasks.jobs.sync_hongsehuojian_fill_validate import (
     compare_etf_row,
@@ -298,7 +298,7 @@ def test_valuation_only_skips_industry_weights() -> None:
             return_value=pe,
         ),
         patch(
-            "scheduled_tasks.jobs.sync_hongsehuojian_fill_validate.upsert_index_valuation_snapshot"
+            "scheduled_tasks.jobs.sync_hongsehuojian_fill_validate.refresh_index_valuation_snapshot"
         ) as upsert_pe,
         patch(
             "scheduled_tasks.jobs.sync_hongsehuojian_fill_validate.fetch_index_industry_weights"
@@ -317,4 +317,3 @@ def test_valuation_only_skips_industry_weights() -> None:
     fetch_w.assert_not_called()
     refresh_w.assert_not_called()
     fetch_etf.assert_not_called()
-

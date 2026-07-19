@@ -2,8 +2,8 @@
 
 本文档描述当前 Supabase PostgreSQL 实例中的表、视图及关系。
 
-- **指数相关表 / 视图**：定义见 `src/scheduled_tasks/models/schema.sql`。全市场指数链路已停更；**`index_daily_prices` 已删除**（`migrations/20260718_drop_index_daily_prices.sql`）。红色火箭 job 可刷新 `etf_valuation`（当日/5y/10y PE）与 `index_industry_weights`；默认 allowlist 为医疗标的。
-- **ETF 相关表**：定义见 `schema.sql`；`etf_daily` 价格由 `sync_etf_kline_yfinance` 主写；`etf_pool` 只读；`etf_valuation` 可由红色火箭 job 写入；红色火箭可对缺失日 INSERT（`price_source='hongsehuojian'`），不覆盖已有行情行。
+- **指数相关表 / 视图**：定义见 `src/scheduled_tasks/models/schema.sql`。全市场指数链路已停更；**`index_daily_prices` 已删除**（`migrations/20260718_drop_index_daily_prices.sql`）。红色火箭 job 可刷新 `index_valuation`（当日/5y/10y PE）与 `index_industry_weights`；默认 allowlist 为医疗标的。
+- **ETF 相关表**：定义见 `schema.sql`；`etf_daily` 价格由 `sync_etf_kline_yfinance` 主写，`etf_pool` 只读；红色火箭可对缺失日 INSERT（`price_source='hongsehuojian'`），不覆盖已有行情行。
 - **汇率**：`fx_rates` 由 `sync_fx_rates_frankfurter` 主写（Frankfurter / ECB）。
 - **驾驶舱用户账本 12 表**：DDL + RLS 见 `migrations/20260710_cockpit_ledger_and_fx_rates.sql`；**业务行由 `stock-charts` UI 写入**，本仓库不写账本数据。
 
@@ -11,8 +11,8 @@ RLS：
 
 - 账本表：`authenticated` 仅能读写 `user_id = auth.uid()` 的行。
 - 已授权共享只读（`authenticated` SELECT；job 经 `DATABASE_URL` 写入）：`fx_rates`、`etf_daily`、`etf_pool`、`indices`。
-- **尚未**在 cockpit migration 中显式 grant / RLS 的共享表：`etf_valuation`、`index_industry_weights`（及依赖它们的指数视图）。客户端若需读，需另补 GRANT/policy。
-- `schema.sql` 本身不含完整 RLS；已有库请执行 `20260710_cockpit_ledger_and_fx_rates.sql`，并补跑 `20260718_etf_pool_authenticated_read.sql`（新库 `etf_pool` 只读策略；幂等）。
+- 指数仪表盘公开读：`20260718_index_market_anon_read.sql` 为 `index_valuation`、`index_industry_weights`、`etf_daily`、`etf_pool`、`indices` 补 `anon` + `authenticated` SELECT policy（幂等）。
+- `schema.sql` 本身不含完整 RLS；已有库请执行 `20260710_cockpit_ledger_and_fx_rates.sql`，并补跑 `20260718_etf_pool_authenticated_read.sql` 与 `20260718_index_market_anon_read.sql`。
 
 > 已有库若仍为 `etf_grid_*` 旧名，请先执行：
 > `psql "$DATABASE_URL" -f src/scheduled_tasks/models/migrations/20260709_etf_rename_and_adj_columns.sql`
@@ -26,10 +26,10 @@ RLS：
 | 表   | `sync_runs`               | 同步任务执行记录（含 `meta`）           | **写入**         |
 | 表   | `etf_pool`                | ETF 当前池（PK=`etf_code`，非历史快照） | **只读**         |
 | 表   | `etf_daily`               | ETF 日行情（OHLC + volume + 前/后复权 + 来源） | **主写**         |
-| 表   | `etf_valuation` | 跟踪指数估值快照（当日/5y/10y PE）      | **红色火箭可写**    |
+| 表   | `index_valuation` | 跟踪指数估值快照（当日/5y/10y PE）      | **红色火箭可写**    |
 | 表   | `fx_rates`                | 日频汇率（USD/CNY/HKD 三角）            | **主写**         |
 | 表   | 账本 12 表                | 见 migration；UI 写入                   | **DDL only**     |
-| 视图 | `index_latest_snapshot`   | 指数最新快照（价 + `etf_valuation` PE） | 可读 |
+| 视图 | `index_latest_snapshot`   | 指数最新快照（价 + `index_valuation` PE） | 可读 |
 | 视图 | `index_detail_snapshot`   | 指数各维度最新日期                      | 可读        |
 
 ### 账本 12 表（DDL only）
@@ -41,12 +41,12 @@ RLS：
 ## 实体关系
 
 > **外键 vs 软关联**：仅 `index_industry_weights` → `indices.code` 为真 FK。
-> `etf_pool.tracking_index_code`、`etf_valuation.tracking_index_code`、`etf_daily.etf_code` ↔ `etf_pool.etf_code`、`sync_runs.index_codes[]` 均为按代码的逻辑关联，**库中无 FK**。
+> `etf_pool.tracking_index_code`、`index_valuation.tracking_index_code`、`etf_daily.etf_code` ↔ `etf_pool.etf_code`、`sync_runs.index_codes[]` 均为按代码的逻辑关联，**库中无 FK**。
 
 ```mermaid
 erDiagram
     indices ||--o{ index_industry_weights : "FK index_code"
-    indices }o..o{ etf_valuation : "软关联 tracking_index_code"
+    indices }o..o{ index_valuation : "软关联 tracking_index_code"
     indices }o..o{ etf_pool : "软关联 tracking_index_code"
     etf_pool }o..o{ etf_daily : "软关联 etf_code"
     sync_runs }o..o{ etf_daily : "index_codes[] 存 ETF 代码"
@@ -88,7 +88,7 @@ erDiagram
 
 ## 指数表
 
-全市场 TuShare `sync_indices` 链路已删除。**`index_daily_prices` 已删除**（`20260718_drop_index_daily_prices.sql`）。红色火箭 job `sync_hongsehuojian_fill_validate`（见 [hongsehuojian-fill-validate.md](./hongsehuojian-fill-validate.md)）可 ensure `indices`、upsert `etf_valuation`，并以红色火箭主源刷新 `index_industry_weights`（默认 allowlist 医疗）。`index_daily_valuations` 已删除；指数视图估值改挂 `etf_valuation`（收盘相关列恒为 null）。
+全市场 TuShare `sync_indices` 链路已删除。**`index_daily_prices` 已删除**（`20260718_drop_index_daily_prices.sql`）。红色火箭 job `sync_hongsehuojian_fill_validate`（见 [hongsehuojian-fill-validate.md](./hongsehuojian-fill-validate.md)）可 ensure `indices`、upsert `index_valuation`，并以红色火箭主源刷新 `index_industry_weights`（默认 allowlist 医疗）。`index_daily_valuations` 已删除；指数视图估值改挂 `index_valuation`（收盘相关列恒为 null）。
 
 ### `indices` — 指数元数据
 
@@ -125,9 +125,9 @@ erDiagram
 | ---- | ---- | ---- |
 | `code` / `name` / `category` / `display_order` | `indices` | 元数据 |
 | `as_of_date` / `close` / `history_high` / `drawdown_from_high_pct` | 常量 `null` | 日线表已删除 |
-| `pe_ttm` | `etf_valuation.current_pe_ttm` | 当日 PE |
+| `pe_ttm` | `index_valuation.current_pe_ttm` | 当日 PE |
 | `pe_ttm_avg_5y` / `pe_ttm_avg_10y` | 同快照表 | 近 5y / 10y PE 均值 |
-| `valuation_as_of_date` | `etf_valuation.trade_date` | 估值日期 |
+| `valuation_as_of_date` | `index_valuation.trade_date` | 估值日期 |
 | `pe_percentile_*` / `pb*` | 常量 `null` | 已无日估值表，分位不再计算 |
 
 ### 视图 `index_detail_snapshot`
@@ -136,7 +136,7 @@ erDiagram
 | ---- | ---- |
 | `code` / `name` / `category` / `display_order` | 元数据 |
 | `latest_price_date` | 恒为 `null`（日线表已删除） |
-| `latest_valuation_date` | `etf_valuation.trade_date` |
+| `latest_valuation_date` | `index_valuation.trade_date` |
 | `latest_industry_date` | `max(index_industry_weights.as_of_date)` |
 
 ---
@@ -228,7 +228,7 @@ RLS：`authenticated` SELECT；job 经 `DATABASE_URL` 写入。表定义见 `sch
 ---
 
 
-### `etf_valuation` — 跟踪指数估值
+### `index_valuation` — 跟踪指数估值
 
 按跟踪指数各一行；红色火箭 job 可 **upsert** 刷新（当日 PE + 5y/10y 均值）。不存日估值序列。
 
@@ -260,12 +260,12 @@ yfinance（Yahoo；海外 runner 可用）
 红色火箭（见 hongsehuojian-fill-validate.md）
     ├─ INSERT-only → etf_daily（price_source=hongsehuojian；不覆盖已有行）
     ├─ INSERT-only → indices（ensure）
-    ├─ upsert → etf_valuation（当日 PE + 5y/10y 均值）
+    ├─ upsert → index_valuation（当日 PE + 5y/10y 均值）
     └─ replace → index_industry_weights（按指数删旧写新）
 
 官网校验（见 official-cross-check.md；默认只读比对）
     ├─ 上交所 yunhq → vs etf_daily OHLC（`--from-pool` 覆盖池内全部 5xxxxx）
-    └─ 中证 index-perf → vs etf_valuation.current_pe_ttm
+    └─ 中证 index-perf → vs index_valuation.current_pe_ttm
        （单标的模式；`--from-pool` 默认跳过指数）
        （--apply-official --yes 才 UPDATE mismatch）
 ```
@@ -323,7 +323,7 @@ psql "$DATABASE_URL" -f src/scheduled_tasks/models/migrations/20260718_drop_pv_e
 # 出池银行/半导体/AI，入池全指信息 + 红利低波100（断言 18 只）
 psql "$DATABASE_URL" -f src/scheduled_tasks/models/migrations/20260718_etf_pool_swap_bank_semi_ai_for_it_div.sql
 
-# 清理不在当前池的残留 indices（+ etf_valuation；行业权重 CASCADE）
+# 清理不在当前池的残留 indices（+ index_valuation；行业权重 CASCADE）
 psql "$DATABASE_URL" -f src/scheduled_tasks/models/migrations/20260718_purge_orphan_indices.sql
 
 # 回填 2025-10-24 ETF 缺复权列
@@ -336,9 +336,12 @@ psql "$DATABASE_URL" -f src/scheduled_tasks/models/migrations/20260718_drop_inde
 # （新库若已跑最新 schema.sql 则无需；旧库必跑；须在 rename_drop_snapshots 之前）
 psql "$DATABASE_URL" -f src/scheduled_tasks/models/migrations/20260717_drop_index_daily_valuations.sql
 
-# 去掉表名 `_snapshots` 后缀：etf_valuation_snapshots→etf_valuation，portfolio_snapshots→portfolio
+# 历史步骤：去掉 `_snapshots` 后缀，etf_valuation_snapshots→etf_valuation
 # （新库若已跑最新 schema.sql + 最新 cockpit migration 则无需；旧库必跑）
 psql "$DATABASE_URL" -f src/scheduled_tasks/models/migrations/20260717_rename_drop_snapshots_suffix.sql
+
+# 名实相符：etf_valuation→index_valuation（保留数据、RLS、GRANT 与视图依赖）
+psql "$DATABASE_URL" -f src/scheduled_tasks/models/migrations/20260719_rename_etf_valuation_to_index_valuation.sql
 ```
 
 `CREATE TABLE IF NOT EXISTS` **不会**给已存在表加列或改名；已有库必须以 migrations 为准。
@@ -392,7 +395,7 @@ from index_latest_snapshot
 order by display_order;
 
 select tracking_index_code, trade_date, current_pe_ttm, pe_ttm_avg_5y, pe_ttm_avg_10y
-from etf_valuation
+from index_valuation
 order by tracking_index_code;
 
 select index_code, as_of_date, sw_level, industry_name, weight_pct

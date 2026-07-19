@@ -11,8 +11,8 @@
 | 数据 | 主写 |
 |------|------|
 | ETF 日 K（`etf_daily`） | yfinance；红色火箭仅缺日 INSERT + 已有行比对 |
-| 指数估值（`etf_valuation`） | 红色火箭 |
-| 指数估值（`etf_valuation`） | 红色火箭 |
+| 指数估值（`index_valuation`） | 红色火箭 |
+| 指数估值（`index_valuation`） | 红色火箭 |
 | 行业权重（`index_industry_weights`） | 红色火箭 |
 
 需要增加 **官网优先的双源校验**：默认不改正库，发现差异告警；人工确认后可用官网覆盖。
@@ -67,9 +67,9 @@
 
 | 对象 | 字段 | 首期 |
 |------|------|------|
-| `etf_valuation` | `current_pe_ttm` | 可选校（日线表已删除，不再校 close） |
-| `etf_valuation` | `current_pe_ttm` | 中证有则校 |
-| `etf_valuation` | `pe_ttm_avg_5y` / `10y` | 暂缓（官网未必有同口径序列） |
+| `index_valuation` | `current_pe_ttm` | 可选校（日线表已删除，不再校 close） |
+| `index_valuation` | `current_pe_ttm` | 中证有则校 |
+| `index_valuation` | `pe_ttm_avg_5y` / `10y` | 暂缓（官网未必有同口径序列） |
 | `index_industry_weights` | — | 二期 |
 
 ## 行为语义

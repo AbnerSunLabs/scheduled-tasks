@@ -101,7 +101,7 @@ create table if not exists etf_daily (
 create index if not exists etf_daily_trade_date_idx
   on etf_daily (trade_date desc);
 
-create table if not exists etf_valuation (
+create table if not exists index_valuation (
   tracking_index_code text primary key,
   trade_date date not null,
   current_pe_ttm numeric,
@@ -134,7 +134,7 @@ create index if not exists fx_rates_rate_date_idx
 -- 用户账本 12 表（依赖 auth.users）不放本文件，见：
 -- models/migrations/20260710_cockpit_ledger_and_fx_rates.sql
 
--- 指数视图：日线表已删除；收盘相关列固定为 null，估值挂 etf_valuation。
+-- 指数视图：日线表已删除；收盘相关列固定为 null，估值挂 index_valuation。
 create or replace view index_latest_snapshot as
 select
   i.code,
@@ -157,7 +157,7 @@ select
   s.pe_ttm_avg_10y,
   s.trade_date as valuation_as_of_date
 from indices i
-left join etf_valuation s on s.tracking_index_code = i.code
+left join index_valuation s on s.tracking_index_code = i.code
 order by i.display_order;
 
 create or replace view index_detail_snapshot as
@@ -169,7 +169,7 @@ select
   null::date as latest_price_date,
   (
     select s.trade_date
-    from etf_valuation s
+    from index_valuation s
     where s.tracking_index_code = i.code
   ) as latest_valuation_date,
   (

@@ -2,7 +2,7 @@
 
 写入语义：
 - ETF：缺失 (code, trade_date) → INSERT；已有行只比对不 UPDATE
-- 指数估值：写入 ``etf_valuation``（当日 PE + 5y/10y 均值），按指数 upsert 刷新
+- 指数估值：写入 ``index_valuation``（当日 PE + 5y/10y 均值），按指数 upsert 刷新
 - 行业权重：红色火箭主源刷新 ``index_industry_weights``（删旧写新）
 - 指数日线表已删除，不再写 ``index_daily_prices``
 """
@@ -25,11 +25,11 @@ from scheduled_tasks.db import (
     ensure_index_row,
     existing_trade_dates,
     fetch_etf_daily_rows,
-    fetch_etf_valuation_snapshot,
+    fetch_index_valuation,
     finish_sync_run,
     insert_etf_daily_bars_ignore_conflict,
     replace_index_industry_weights,
-    upsert_etf_valuation_snapshot,
+    upsert_index_valuation,
 )
 from scheduled_tasks.etf.hongsehuojian_client import (
     fetch_etf_daily_bundle,
@@ -222,7 +222,7 @@ def fill_and_validate_etf(
             )
 
 
-def upsert_index_valuation_snapshot(
+def refresh_index_valuation_snapshot(
     conn: Any,
     index_code: str,
     remote: dict[str, Any],
@@ -230,8 +230,8 @@ def upsert_index_valuation_snapshot(
     epsilon: float,
     summary: SyncSummary,
 ) -> None:
-    """刷新 etf_valuation；若库中已有旧快照则先比对再 upsert。"""
-    existing = fetch_etf_valuation_snapshot(conn, index_code)
+    """刷新 index_valuation；若库中已有旧快照则先比对再 upsert。"""
+    existing = fetch_index_valuation(conn, index_code)
     if existing is not None:
         diffs: list[dict[str, Any]] = []
         for field_name in VALUATION_COMPARE_FIELDS:
@@ -248,7 +248,7 @@ def upsert_index_valuation_snapshot(
             if len(summary.mismatches) < MAX_MISMATCH_SAMPLES:
                 summary.mismatches.append(
                     {
-                        "kind": "etf_valuation",
+                        "kind": "index_valuation",
                         "code": index_code,
                         "trade_date": remote["trade_date"].isoformat()
                         if isinstance(remote["trade_date"], date)
@@ -258,7 +258,7 @@ def upsert_index_valuation_snapshot(
                     }
                 )
 
-    upsert_etf_valuation_snapshot(conn, remote)
+    upsert_index_valuation(conn, remote)
     summary.valuation_upserted = True
     td = remote["trade_date"]
     summary.valuation_trade_date = td.isoformat() if isinstance(td, date) else str(td)
@@ -324,7 +324,7 @@ def run(
             )
 
         remote_val = fetch_index_pe_snapshot(index_code)
-        upsert_index_valuation_snapshot(
+        refresh_index_valuation_snapshot(
             conn, index_code, remote_val, epsilon=epsilon, summary=summary
         )
 

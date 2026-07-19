@@ -14,7 +14,7 @@ alwaysApply: true
 1. `etf_pool` 行
 2. `etf_daily`（该 `etf_code`）
 3. 若跟踪指数**不再被池内任何 ETF 引用**：
-   - `etf_valuation`（`tracking_index_code`）
+   - `index_valuation`（`tracking_index_code`）
    - `indices`（删行后 `index_industry_weights` 经 FK CASCADE 自动清）
 
 删除指数前用 `not exists (select 1 from etf_pool where tracking_index_code = …)` 守卫，避免误删仍被引用的指数。
@@ -25,18 +25,18 @@ alwaysApply: true
 
 1. `insert` `etf_pool`（含正确 `tracking_index_code` / `tracking_index_name`）
 2. `insert` `indices`（`ON CONFLICT DO NOTHING`）
-3. 随后用红色火箭等 job 补 `etf_valuation` / `index_industry_weights`（能拉到的才写；跨境无数据可空）
+3. 随后用红色火箭等 job 补 `index_valuation` / `index_industry_weights`（能拉到的才写；跨境无数据可空）
 
 ## 反例 / 正例
 
 ```text
 ❌ 只 delete etf_pool / etf_daily，indices 与行业权重残留
 ❌ 只 insert etf_pool，忘记 indices，后续 FK/视图对不上
-✅ 出池迁移同时条件删除独占指数 + etf_valuation
+✅ 出池迁移同时条件删除独占指数 + index_valuation
 ✅ 入池迁移同时 upsert indices，再跑 fill/valuation
 ```
 
 ## 自检
 
-- [ ] 出池后：`indices` / `etf_valuation` / `index_industry_weights` 无孤儿？
+- [ ] 出池后：`indices` / `index_valuation` / `index_industry_weights` 无孤儿？
 - [ ] 入池后：`tracking_index_code` 在 `indices` 有对应行？

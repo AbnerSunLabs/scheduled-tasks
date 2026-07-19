@@ -181,6 +181,17 @@ select public._tmp_comment_if_exists('column', 'public.etf_valuation_snapshots.p
 select public._tmp_comment_if_exists('column', 'public.etf_valuation_snapshots.updated_at', '更新时间');
 
 -- ===========================================================================
+-- index_valuation（20260719 改名后的当前表）
+-- ===========================================================================
+select public._tmp_comment_if_exists('table', 'public.index_valuation', '指数估值最新快照（当日 PE + 5y/10y 均值）');
+select public._tmp_comment_if_exists('column', 'public.index_valuation.tracking_index_code', '指数代码');
+select public._tmp_comment_if_exists('column', 'public.index_valuation.trade_date', '估值数据日期');
+select public._tmp_comment_if_exists('column', 'public.index_valuation.current_pe_ttm', '当前 PE（TTM）');
+select public._tmp_comment_if_exists('column', 'public.index_valuation.pe_ttm_avg_5y', '近 5 年 PE 均值');
+select public._tmp_comment_if_exists('column', 'public.index_valuation.pe_ttm_avg_10y', '近 10 年 PE 均值');
+select public._tmp_comment_if_exists('column', 'public.index_valuation.updated_at', '更新时间');
+
+-- ===========================================================================
 -- fx_rates
 -- ===========================================================================
 select public._tmp_comment_if_exists('table', 'public.fx_rates', '日频汇率（USD/CNY/HKD 三角；Frankfurter/ECB）');

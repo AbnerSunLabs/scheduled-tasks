@@ -34,45 +34,54 @@ GitHub Actions：workflow `应用驾驶舱 Migration`，勾选 `apply_rename_mig
 ```bash
 psql "$DATABASE_URL" -f src/scheduled_tasks/models/migrations/20260710_cockpit_ledger_and_fx_rates.sql
 psql "$DATABASE_URL" -f src/scheduled_tasks/models/migrations/20260718_etf_pool_authenticated_read.sql
+psql "$DATABASE_URL" -f src/scheduled_tasks/models/migrations/20260718_index_market_anon_read.sql
 ```
 
 只读验证：`etf_pool` 已 `ENABLE ROW LEVEL SECURITY`，且存在 `etf_pool_select_authenticated`；`authenticated` 有 `SELECT`。
 
-7. **清理废弃列/表**（旧库；可重复执行）：
+7. **指数估值表改名**（旧库；幂等，单独执行）：
+
+```bash
+psql "$DATABASE_URL" -f src/scheduled_tasks/models/migrations/20260719_rename_etf_valuation_to_index_valuation.sql
+```
+
+只读验证：`index_valuation` 存在且行数与迁移前一致，`etf_valuation` 不存在；主键约束为 `index_valuation_pkey`，公开读 policy 为 `index_valuation_select_anon` / `index_valuation_select_authenticated`。
+
+8. **清理废弃列/表**（旧库；可重复执行）：
 
 ```bash
 psql "$DATABASE_URL" -f src/scheduled_tasks/models/migrations/20260717_drop_etf_daily_amount_columns.sql
 psql "$DATABASE_URL" -f src/scheduled_tasks/models/migrations/20260717_drop_trade_calendar.sql
 ```
 
-8. **表/列中文注释**（幂等；Dashboard 列 Description 可见）：
+9. **表/列中文注释**（幂等；Dashboard 列 Description 可见）：
 
 ```bash
 psql "$DATABASE_URL" -f src/scheduled_tasks/models/migrations/20260716_add_chinese_comments.sql
 ```
 
-9. Confirm these tables exist:
+10. Confirm these tables exist:
    - `indices`（红色火箭可 ensure）
    - `index_industry_weights`（红色火箭主写）
    - `sync_runs`（含 `meta jsonb`）
    - `etf_pool`
    - `etf_daily`（复权 8 列 + `price_source`；无成交额列）
-   - `etf_valuation`（红色火箭可写）
+   - `index_valuation`（红色火箭可写）
    - `fx_rates`（`rate_date` + 货币对 PK；Frankfurter）
    - 账本 12 表（DDL only；见 `20260710_cockpit_ledger_and_fx_rates.sql`）
    - 确认 **不存在** `index_daily_prices`（`20260718_drop_index_daily_prices.sql`）
    - 确认 **不存在** `index_daily_valuations`（已由 `20260717_drop_index_daily_valuations.sql` 删除）
    - 确认 **不存在** `trade_calendar`（`20260717_drop_trade_calendar.sql`）
    - 确认 `etf_daily` **无** `amount` / `amount_source` / `amount_updated_at`（`20260717_drop_etf_daily_amount_columns.sql`）
-   - 确认 **不存在** `etf_valuation_snapshots` / `portfolio_snapshots`（已由 `20260717_rename_drop_snapshots_suffix.sql` 更名为 `etf_valuation` / `portfolio`）
-10. Confirm these views exist（估值列改挂 `etf_valuation`）:
+   - 确认 **不存在** `etf_valuation_snapshots` / `etf_valuation` / `portfolio_snapshots`（前两者已依次迁移为 `index_valuation`）
+11. Confirm these views exist（估值列改挂 `index_valuation`）:
 
 - `index_latest_snapshot`
 - `index_detail_snapshot`
 
-11. Confirm 旧表名 `etf_grid_*` 与 `etf_pool_snapshots` **不存在**；主键约束名为 `etf_*_pkey` / `etf_pool_pkey` / `etf_valuation_pkey` / `portfolio_pkey`。
-12. Confirm 索引存在：`etf_daily_trade_date_idx`、`etf_pool_snapshot_date_idx`、`fx_rates_rate_date_idx`。
-13. Confirm 中文注释已挂上（按列名抽查）：
+12. Confirm 旧表名 `etf_grid_*` 与 `etf_pool_snapshots` **不存在**；主键约束名为 `etf_*_pkey` / `etf_pool_pkey` / `index_valuation_pkey` / `portfolio_pkey`。
+13. Confirm 索引存在：`etf_daily_trade_date_idx`、`etf_pool_snapshot_date_idx`、`fx_rates_rate_date_idx`。
+14. Confirm 中文注释已挂上（按列名抽查）：
 
 ```sql
 select obj_description('public.etf_daily'::regclass);

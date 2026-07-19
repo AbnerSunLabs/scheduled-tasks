@@ -383,7 +383,7 @@ def fetch_index_pe_snapshot(
 ) -> dict[str, Any]:
     """拉取指数 PE 快照：当日 + 近 5 年均值 + 近 10 年均值。
 
-    对应表 ``etf_valuation``（不落日估值序列）。5y/10y 两路并行。
+    对应表 ``index_valuation``（不落日估值序列）。5y/10y 两路并行。
     """
     from concurrent.futures import ThreadPoolExecutor
 

@@ -2,7 +2,7 @@
 
 默认只比对、不写库；``--apply-official`` 才对 mismatch 行 UPDATE。
 缺日不 INSERT（补缺仍归 yfinance / 红色火箭）。
-指数日线表已删除：指数侧仅校验 ``etf_valuation.current_pe_ttm``。
+指数日线表已删除：指数侧仅校验 ``index_valuation.current_pe_ttm``。
 """
 
 from __future__ import annotations
@@ -22,10 +22,10 @@ from scheduled_tasks.db import (
     create_sync_run,
     fetch_etf_daily_rows,
     fetch_etf_pool,
-    fetch_etf_valuation_snapshot,
+    fetch_index_valuation,
     finish_sync_run,
     update_etf_daily_ohlc_official,
-    update_etf_valuation_pe_official,
+    update_index_valuation_pe_official,
 )
 from scheduled_tasks.etf.csindex_client import (
     fetch_index_daily_bars,
@@ -222,7 +222,7 @@ def cross_check_index(
     )
     if latest_with_pe is None:
         return
-    existing = fetch_etf_valuation_snapshot(conn, index_code)
+    existing = fetch_index_valuation(conn, index_code)
     if existing is None:
         return
     summary.valuation_validated = 1
@@ -235,7 +235,7 @@ def cross_check_index(
         _append_mismatch(
             summary,
             {
-                "kind": "etf_valuation",
+                "kind": "index_valuation",
                 "tracking_index_code": index_code,
                 "trade_date": latest_with_pe["trade_date"].isoformat(),
                 "diffs": [
@@ -250,7 +250,7 @@ def cross_check_index(
             },
         )
         if apply_official:
-            summary.valuation_applied = update_etf_valuation_pe_official(
+            summary.valuation_applied = update_index_valuation_pe_official(
                 conn,
                 tracking_index_code=index_code,
                 trade_date=latest_with_pe["trade_date"],

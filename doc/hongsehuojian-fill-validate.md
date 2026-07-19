@@ -6,7 +6,7 @@
 
 1. **补缺**：库中不存在的 `(code, trade_date)` → `INSERT`（ETF 日 K、指数收盘价）
 2. **校验**：已有 ETF/指数收盘行只比对，**不 UPDATE**
-3. **估值**：写入 `etf_valuation`（当日 PE + 近 5 年 / 近 10 年均值），按指数 **upsert 刷新**
+3. **估值**：写入 `index_valuation`（当日 PE + 近 5 年 / 近 10 年均值），按指数 **upsert 刷新**
 
 ## 默认标的
 
@@ -33,10 +33,10 @@
 
 - `etf_daily`：`price_source='hongsehuojian'`（仅新行；不含成交额）
 - `indices`：缺则插入元数据（`ON CONFLICT DO NOTHING`）
-- `etf_valuation`：`tracking_index_code` 主键，刷新当日 PE / 5y / 10y 均值
+- `index_valuation`：`tracking_index_code` 主键，刷新当日 PE / 5y / 10y 均值
 - `index_industry_weights`：红色火箭主源，按指数删旧写新（最新一期 sw1/sw2/sw3）
 - `sync_runs`：`job_name=sync_hongsehuojian_fill_validate`
-- 估值：红色火箭对池内可解析指数刷 `etf_valuation`。实测：**境内数字码 + `*.HI`（恒生/恒生科技）有 PE**；`H*.CSI` 半导体/中概互联/机器人、以及 `NDX.NASDAQ` / `SPX.OTH` 接口无估值数据，写不了。
+- 估值：红色火箭对池内可解析指数刷 `index_valuation`。实测：**境内数字码 + `*.HI`（恒生/恒生科技）有 PE**；`H*.CSI` 半导体/中概互联/机器人、以及 `NDX.NASDAQ` / `SPX.OTH` 接口无估值数据，写不了。
 
 ## 本地运行
 
@@ -54,7 +54,7 @@ python3 -m scheduled_tasks.jobs.sync_hongsehuojian_fill_validate --mode=full
 
 摘要：`artifacts/sync_hongsehuojian_fill_validate_summary.json`
 
-`valuation-only` 仅 upsert `etf_valuation`（当日 PE + 5y/10y）；**不**拉 K 线、**不**刷新 `index_industry_weights`。
+`valuation-only` 仅 upsert `index_valuation`（当日 PE + 5y/10y）；**不**拉 K 线、**不**刷新 `index_industry_weights`。
 
 官网交叉校验（上交所 / 中证 vs 库）见 [official-cross-check.md](./official-cross-check.md)，与本 job 互补：本 job 主写补缺，官网 job 只比对/可选纠偏。
 
