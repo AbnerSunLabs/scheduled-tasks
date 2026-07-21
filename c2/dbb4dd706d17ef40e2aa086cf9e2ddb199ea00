@@ -1,0 +1,25 @@
+doc/hongsehuojian-fill-validate.md
+  s_81fd086b7ede16::t_c1394ba3d706c2 49,51,54,60-62
+src/scheduled_tasks/etf/hongsehuojian_client.py
+  s_81fd086b7ede16::t_99733df4c6e391 26-31,406,409-413,468,522-523
+src/scheduled_tasks/jobs/sync_hongsehuojian_fill_validate.py
+  s_81fd086b7ede16::t_20f6f5660df8a8 38-39,367,383-391,424,434,460,516
+tests/test_hongsehuojian.py
+  s_81fd086b7ede16::t_496caac2fb0a23 11-18,20-21,327,333-340
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "c2dbb4dd706d17ef40e2aa086cf9e2ddb199ea00",
+  "prompts": {},
+  "sessions": {
+    "s_81fd086b7ede16": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "3b013fc1-7a29-4928-b9be-51c4f6868395",
+        "model": "unknown"
+      },
+      "human_author": "AbnerSun <sunyujiejohn@sina.com>"
+    }
+  }
+}
