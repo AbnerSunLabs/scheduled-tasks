@@ -15,9 +15,10 @@ import json
 import math
 import traceback
 from dataclasses import dataclass, field
-from datetime import date
+from datetime import date, datetime, time
 from pathlib import Path
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from scheduled_tasks.config import load_settings
 from scheduled_tasks.db import (
@@ -42,6 +43,9 @@ from scheduled_tasks.etf.hongsehuojian_client import (
 
 JOB_NAME = "sync_hongsehuojian_fill_validate"
 SUMMARY_PATH = Path("artifacts/sync_hongsehuojian_fill_validate_summary.json")
+SHANGHAI_TZ = ZoneInfo("Asia/Shanghai")
+# A 股收盘后留一点缓冲，再接受「当日收盘」为定稿。
+ASHARE_CLOSE_FINALIZE = time(15, 5)
 
 # 默认 allowlist
 DEFAULT_ETF_CODE = "512170"
@@ -54,6 +58,82 @@ INDEX_DISPLAY_NAMES: dict[str, str] = {
     "399989.SZ": "中证医疗",
     "000300.SH": "沪深300",
 }
+
+
+def shanghai_now() -> datetime:
+    return datetime.now(tz=SHANGHAI_TZ)
+
+
+def is_final_ashare_close_date(trade_date: date, *, now: datetime | None = None) -> bool:
+    """盘中不把「今天」当已收盘；仅上一交易日及更早，或今日已过 15:05。"""
+    current = now or shanghai_now()
+    if current.tzinfo is None:
+        current = current.replace(tzinfo=SHANGHAI_TZ)
+    else:
+        current = current.astimezone(SHANGHAI_TZ)
+    today = current.date()
+    if trade_date < today:
+        return True
+    if trade_date > today:
+        return False
+    return current.time() >= ASHARE_CLOSE_FINALIZE
+
+
+def filter_unfinalized_closes(
+    rows: list[dict[str, Any]],
+    *,
+    now: datetime | None = None,
+) -> list[dict[str, Any]]:
+    """去掉尚未定稿的当日收盘，避免盘中把盘中价写成日收盘。"""
+    out: list[dict[str, Any]] = []
+    for row in rows:
+        trade_date = row["trade_date"]
+        if isinstance(trade_date, str):
+            trade_date = date.fromisoformat(trade_date)
+        if row.get("close") is not None and not is_final_ashare_close_date(trade_date, now=now):
+            cleaned = dict(row)
+            cleaned["close"] = None
+            cleaned["price_source"] = None
+            if cleaned.get("pe_ttm") is None and cleaned.get("pb") is None:
+                continue
+            out.append(cleaned)
+            continue
+        out.append(row)
+    return out
+
+
+def clear_unfinalized_today_close(conn: Any, index_code: str, *, now: datetime | None = None) -> int:
+    """清掉盘中误写入的「今日收盘」行/字段。"""
+    current = now or shanghai_now()
+    today = current.astimezone(SHANGHAI_TZ).date()
+    if is_final_ashare_close_date(today, now=current):
+        return 0
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            delete from public.index_daily_metrics
+            where index_code = %s
+              and trade_date = %s
+              and pe_ttm is null
+              and pb is null
+            """,
+            (index_code, today),
+        )
+        deleted = cur.rowcount
+        cur.execute(
+            """
+            update public.index_daily_metrics
+            set close = null,
+                price_source = null,
+                updated_at = now()
+            where index_code = %s
+              and trade_date = %s
+              and close is not null
+            """,
+            (index_code, today),
+        )
+        return deleted + cur.rowcount
+
 
 ETF_COMPARE_FIELDS = (
     "open",
@@ -286,13 +366,15 @@ def refresh_index_daily_metrics(
     include_prices: bool = True,
     max_price_bars: int | None = None,
 ) -> None:
-    """拉取并 upsert 指数 PE/PB（及收盘）日序列到 index_daily_metrics。"""
+    """拉取并 upsert 指数 PE/PB（及已收盘）日序列到 index_daily_metrics。"""
+    clear_unfinalized_today_close(conn, index_code)
     rows = fetch_index_daily_metrics_bundle(
         index_code,
         time_interval=time_interval,
         include_prices=include_prices,
         max_price_bars=max_price_bars,
     )
+    rows = filter_unfinalized_closes(rows)
     summary.index_metric_rows = upsert_index_daily_metrics(conn, rows)
 
 

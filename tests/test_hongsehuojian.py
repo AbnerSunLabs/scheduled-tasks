@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 from unittest.mock import MagicMock, patch
+from zoneinfo import ZoneInfo
 
 import pytest
 
@@ -18,6 +19,8 @@ from scheduled_tasks.etf.hongsehuojian_client import (
 from scheduled_tasks.jobs.sync_hongsehuojian_fill_validate import (
     compare_etf_row,
     fill_and_validate_etf,
+    filter_unfinalized_closes,
+    is_final_ashare_close_date,
     values_mismatch,
 )
 
@@ -361,6 +364,37 @@ def test_merge_index_metric_rows_combines_pe_and_pb() -> None:
     assert rows[0]["close"] == 4600.0
     assert rows[0]["valuation_source"] == "hongsehuojian"
     assert rows[0]["price_source"] == "hongsehuojian"
+
+
+def test_filter_unfinalized_closes_drops_intraday_today() -> None:
+    now = datetime(2026, 7, 21, 11, 30, tzinfo=ZoneInfo("Asia/Shanghai"))
+    assert is_final_ashare_close_date(date(2026, 7, 20), now=now) is True
+    assert is_final_ashare_close_date(date(2026, 7, 21), now=now) is False
+    rows = filter_unfinalized_closes(
+        [
+            {
+                "index_code": "000300.SH",
+                "trade_date": date(2026, 7, 21),
+                "close": 4679.0,
+                "pe_ttm": None,
+                "pb": None,
+                "price_source": "hongsehuojian",
+                "valuation_source": None,
+            },
+            {
+                "index_code": "000300.SH",
+                "trade_date": date(2026, 7, 20),
+                "close": 4598.0,
+                "pe_ttm": 14.3,
+                "pb": 1.45,
+                "price_source": "hongsehuojian",
+                "valuation_source": "hongsehuojian",
+            },
+        ],
+        now=now,
+    )
+    assert len(rows) == 1
+    assert rows[0]["trade_date"] == date(2026, 7, 20)
 
 
 def test_upsert_index_daily_metrics_sql_shape() -> None:
