@@ -324,7 +324,7 @@ def test_valuation_only_skips_industry_weights() -> None:
     assert out.status == "success"
     upsert_pe.assert_called_once()
     refresh_metrics.assert_called_once()
-    assert refresh_metrics.call_args.kwargs["time_interval"] == VALUATION_INTERVAL_MAX
+    assert refresh_metrics.call_args.kwargs["time_interval"] == VALUATION_INTERVAL_RECENT
     fetch_w.assert_not_called()
     refresh_w.assert_not_called()
     fetch_etf.assert_not_called()
@@ -332,7 +332,7 @@ def test_valuation_only_skips_industry_weights() -> None:
 
 def test_valuation_time_interval_for_mode() -> None:
     assert valuation_time_interval_for_mode("full") == VALUATION_INTERVAL_MAX
-    assert valuation_time_interval_for_mode("valuation-only") == VALUATION_INTERVAL_MAX
+    assert valuation_time_interval_for_mode("valuation-only") == VALUATION_INTERVAL_RECENT
     assert valuation_time_interval_for_mode("incremental") == VALUATION_INTERVAL_RECENT
     with pytest.raises(ValueError):
         valuation_time_interval_for_mode("unknown")

@@ -381,10 +381,10 @@ def refresh_index_daily_metrics(
 
 
 def valuation_time_interval_for_mode(mode: str) -> str:
-    """full / valuation-only 拉全量估值；incremental 仅近 10 年。"""
-    if mode in {"full", "valuation-only"}:
+    """full 拉全量估值；valuation-only / incremental 仅近 10 年（日常增量）。"""
+    if mode == "full":
         return VALUATION_INTERVAL_MAX
-    if mode == "incremental":
+    if mode in {"valuation-only", "incremental"}:
         return VALUATION_INTERVAL_RECENT
     raise ValueError(f"unsupported mode: {mode}")
 
