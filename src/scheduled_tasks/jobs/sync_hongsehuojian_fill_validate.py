@@ -35,6 +35,8 @@ from scheduled_tasks.db import (
     upsert_index_valuation,
 )
 from scheduled_tasks.etf.hongsehuojian_client import (
+    VALUATION_INTERVAL_MAX,
+    VALUATION_INTERVAL_RECENT,
     fetch_etf_daily_bundle,
     fetch_index_daily_metrics_bundle,
     fetch_index_industry_weights,
@@ -362,7 +364,7 @@ def refresh_index_daily_metrics(
     index_code: str,
     *,
     summary: SyncSummary,
-    time_interval: str = "last_10_years",
+    time_interval: str = VALUATION_INTERVAL_RECENT,
     include_prices: bool = True,
     max_price_bars: int | None = None,
 ) -> None:
@@ -376,6 +378,15 @@ def refresh_index_daily_metrics(
     )
     rows = filter_unfinalized_closes(rows)
     summary.index_metric_rows = upsert_index_daily_metrics(conn, rows)
+
+
+def valuation_time_interval_for_mode(mode: str) -> str:
+    """full / valuation-only 拉全量估值；incremental 仅近 10 年。"""
+    if mode in {"full", "valuation-only"}:
+        return VALUATION_INTERVAL_MAX
+    if mode == "incremental":
+        return VALUATION_INTERVAL_RECENT
+    raise ValueError(f"unsupported mode: {mode}")
 
 
 def refresh_index_industry_weights(
@@ -410,6 +421,7 @@ def run(
     conn = connect(settings.database_url)
     run_id: int | None = None
     max_bars = None if mode == "full" else lookback_bars
+    valuation_interval = valuation_time_interval_for_mode(mode)
     try:
         run_id = create_sync_run(
             conn,
@@ -419,6 +431,7 @@ def run(
                 "source": "hongsehuojian",
                 "mode": mode,
                 "lookback_bars": lookback_bars if mode == "incremental" else None,
+                "valuation_time_interval": valuation_interval,
                 "epsilon": epsilon,
                 "end": (end or date.today()).isoformat(),
             },
@@ -444,6 +457,7 @@ def run(
             conn,
             index_code,
             summary=summary,
+            time_interval=valuation_interval,
             include_prices=True,
             max_price_bars=price_bars,
         )
@@ -499,7 +513,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--mode",
         choices=("incremental", "full", "valuation-only"),
         default="incremental",
-        help="incremental=近 N 根(默认快)；full=全历史；valuation-only=只刷估值快照+日序列",
+        help="incremental=近 N 根+近10年估值；full=全历史；valuation-only=全量估值快照+日序列",
     )
     parser.add_argument(
         "--lookback-bars",
