@@ -10,6 +10,7 @@ import pytest
 from scheduled_tasks.etf.hongsehuojian_client import (
     _mean_positive_valuations,
     build_etf_daily_rows,
+    merge_index_metric_rows,
     parse_kline_items,
     parse_trade_date,
     to_security_code,
@@ -272,11 +273,10 @@ def test_valuation_only_skips_industry_weights() -> None:
 
     pe = {
         "tracking_index_code": "399989.SZ",
-        "as_of_date": date(2026, 7, 17),
+        "trade_date": date(2026, 7, 17),
         "current_pe_ttm": 26.0,
         "pe_ttm_avg_5y": 20.0,
         "pe_ttm_avg_10y": 18.0,
-        "source": "hongsehuojian",
     }
 
     with (
@@ -301,6 +301,9 @@ def test_valuation_only_skips_industry_weights() -> None:
             "scheduled_tasks.jobs.sync_hongsehuojian_fill_validate.refresh_index_valuation_snapshot"
         ) as upsert_pe,
         patch(
+            "scheduled_tasks.jobs.sync_hongsehuojian_fill_validate.refresh_index_daily_metrics"
+        ) as refresh_metrics,
+        patch(
             "scheduled_tasks.jobs.sync_hongsehuojian_fill_validate.fetch_index_industry_weights"
         ) as fetch_w,
         patch(
@@ -314,6 +317,62 @@ def test_valuation_only_skips_industry_weights() -> None:
         out = job.run(mode="valuation-only")
     assert out.status == "success"
     upsert_pe.assert_called_once()
+    refresh_metrics.assert_called_once()
     fetch_w.assert_not_called()
     refresh_w.assert_not_called()
     fetch_etf.assert_not_called()
+
+
+def test_merge_index_metric_rows_combines_pe_and_pb() -> None:
+    rows = merge_index_metric_rows(
+        [
+            {
+                "index_code": "000300.SH",
+                "trade_date": date(2026, 7, 20),
+                "close": None,
+                "pe_ttm": 14.3,
+                "pb": None,
+                "price_source": None,
+                "valuation_source": "hongsehuojian",
+            },
+            {
+                "index_code": "000300.SH",
+                "trade_date": date(2026, 7, 20),
+                "close": None,
+                "pe_ttm": None,
+                "pb": 1.45,
+                "price_source": None,
+                "valuation_source": "hongsehuojian",
+            },
+        ]
+    )
+    assert len(rows) == 1
+    assert rows[0]["pe_ttm"] == 14.3
+    assert rows[0]["pb"] == 1.45
+    assert rows[0]["valuation_source"] == "hongsehuojian"
+
+
+def test_upsert_index_daily_metrics_sql_shape() -> None:
+    from scheduled_tasks.db import upsert_index_daily_metrics
+
+    conn = MagicMock()
+    cur = MagicMock()
+    conn.cursor.return_value.__enter__.return_value = cur
+    n = upsert_index_daily_metrics(
+        conn,
+        [
+            {
+                "index_code": "000300.SH",
+                "trade_date": date(2026, 7, 20),
+                "close": None,
+                "pe_ttm": 14.3,
+                "pb": 1.45,
+                "price_source": None,
+                "valuation_source": "hongsehuojian",
+            }
+        ],
+    )
+    assert n == 1
+    sql = cur.executemany.call_args.args[0]
+    assert "index_daily_metrics" in sql
+    assert "coalesce(excluded.pe_ttm" in sql

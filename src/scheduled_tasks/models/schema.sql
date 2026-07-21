@@ -110,29 +110,9 @@ create table if not exists index_valuation (
   updated_at timestamptz not null default now()
 );
 
--- 汇率（共享只读；RLS 与用户账本见 migrations/20260710_cockpit_ledger_and_fx_rates.sql）
-create table if not exists fx_rates (
-  rate_date date not null,
-  from_currency text not null,
-  to_currency text not null,
-  rate numeric(18, 8) not null,
-  source text not null default 'frankfurter',
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now(),
-  primary key (rate_date, from_currency, to_currency),
-  constraint fx_rates_from_currency_check
-    check (from_currency in ('CNY', 'HKD', 'USD')),
-  constraint fx_rates_to_currency_check
-    check (to_currency in ('CNY', 'HKD', 'USD')),
-  constraint fx_rates_pair_distinct check (from_currency <> to_currency),
-  constraint fx_rates_rate_positive check (rate > 0)
-);
-
-create index if not exists fx_rates_rate_date_idx
-  on fx_rates (rate_date desc);
-
 -- 用户账本 12 表（依赖 auth.users）不放本文件，见：
 -- models/migrations/20260710_cockpit_ledger_and_fx_rates.sql
+-- fx_rates 已下线：见 migrations/20260721_drop_fx_rates.sql
 
 -- 指数视图：日线表已删除；收盘相关列固定为 null，估值挂 index_valuation。
 create or replace view index_latest_snapshot as

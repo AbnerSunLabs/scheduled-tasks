@@ -471,41 +471,6 @@ def update_index_valuation_pe_official(
         return cur.rowcount
 
 
-def get_fx_max_rate_date(conn: Connection[dict[str, Any]]) -> date | None:
-    with conn.cursor() as cur:
-        cur.execute("select max(rate_date) as last_date from public.fx_rates")
-        row = cur.fetchone()
-    if not row or row["last_date"] is None:
-        return None
-    return row["last_date"]
-
-
-def upsert_fx_rates(
-    conn: Connection[dict[str, Any]],
-    rows: Iterable[dict[str, Any]],
-) -> int:
-    """按 (rate_date, from_currency, to_currency) upsert 汇率。"""
-    values = list(rows)
-    if not values:
-        return 0
-    with conn.cursor() as cur:
-        cur.executemany(
-            """
-            insert into public.fx_rates (
-              rate_date, from_currency, to_currency, rate, source, updated_at
-            ) values (
-              %(rate_date)s, %(from_currency)s, %(to_currency)s, %(rate)s, %(source)s, now()
-            )
-            on conflict (rate_date, from_currency, to_currency) do update
-            set rate = excluded.rate,
-                source = excluded.source,
-                updated_at = now()
-            """,
-            values,
-        )
-    return len(values)
-
-
 def fetch_etf_daily_rows(
     conn: Connection[dict[str, Any]],
     etf_code: str,
@@ -626,6 +591,40 @@ def upsert_index_valuation(
             """,
             row,
         )
+
+
+def upsert_index_daily_metrics(
+    conn: Connection[dict[str, Any]],
+    rows: Iterable[dict[str, Any]],
+) -> int:
+    """按 (index_code, trade_date) 字段级 coalesce upsert 日指标。
+
+    仅覆盖传入的非空字段，避免用 null 抹掉已有 close / PE / PB。
+    """
+    values = list(rows)
+    if not values:
+        return 0
+    with conn.cursor() as cur:
+        cur.executemany(
+            """
+            insert into public.index_daily_metrics as m (
+              index_code, trade_date, close, pe_ttm, pb,
+              price_source, valuation_source, updated_at
+            ) values (
+              %(index_code)s, %(trade_date)s, %(close)s, %(pe_ttm)s, %(pb)s,
+              %(price_source)s, %(valuation_source)s, now()
+            )
+            on conflict (index_code, trade_date) do update set
+              close = coalesce(excluded.close, m.close),
+              pe_ttm = coalesce(excluded.pe_ttm, m.pe_ttm),
+              pb = coalesce(excluded.pb, m.pb),
+              price_source = coalesce(excluded.price_source, m.price_source),
+              valuation_source = coalesce(excluded.valuation_source, m.valuation_source),
+              updated_at = now()
+            """,
+            values,
+        )
+    return len(values)
 
 
 def replace_index_industry_weights(

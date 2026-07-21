@@ -3,6 +3,7 @@
 写入语义：
 - ETF：缺失 (code, trade_date) → INSERT；已有行只比对不 UPDATE
 - 指数估值：写入 ``index_valuation``（当日 PE + 5y/10y 均值），按指数 upsert 刷新
+- 指数日指标：upsert ``index_daily_metrics`` 的 PE/PB 历史（valuation-only / incremental / full）
 - 行业权重：红色火箭主源刷新 ``index_industry_weights``（删旧写新）
 - 指数日线表已删除，不再写 ``index_daily_prices``
 """
@@ -29,10 +30,12 @@ from scheduled_tasks.db import (
     finish_sync_run,
     insert_etf_daily_bars_ignore_conflict,
     replace_index_industry_weights,
+    upsert_index_daily_metrics,
     upsert_index_valuation,
 )
 from scheduled_tasks.etf.hongsehuojian_client import (
     fetch_etf_daily_bundle,
+    fetch_index_daily_metrics_bundle,
     fetch_index_industry_weights,
     fetch_index_pe_snapshot,
 )
@@ -46,6 +49,11 @@ DEFAULT_INDEX_CODE = "399989.SZ"
 DEFAULT_INDEX_NAME = "中证医疗"
 DEFAULT_EPSILON = 0.001
 MAX_MISMATCH_SAMPLES = 50
+
+INDEX_DISPLAY_NAMES: dict[str, str] = {
+    "399989.SZ": "中证医疗",
+    "000300.SH": "沪深300",
+}
 
 ETF_COMPARE_FIELDS = (
     "open",
@@ -91,6 +99,7 @@ class SyncSummary:
     valuation_pe_ttm_avg_5y: float | None = None
     valuation_pe_ttm_avg_10y: float | None = None
     valuation_mismatch_count: int = 0
+    index_metric_rows: int = 0
     industry_weight_rows: int = 0
     industry_weight_as_of: str | None = None
     mismatches: list[dict[str, Any]] = field(default_factory=list)
@@ -117,6 +126,7 @@ class SyncSummary:
             "valuation_pe_ttm_avg_5y": self.valuation_pe_ttm_avg_5y,
             "valuation_pe_ttm_avg_10y": self.valuation_pe_ttm_avg_10y,
             "valuation_mismatch_count": self.valuation_mismatch_count,
+            "index_metric_rows": self.index_metric_rows,
             "industry_weight_rows": self.industry_weight_rows,
             "industry_weight_as_of": self.industry_weight_as_of,
             "mismatches": self.mismatches,
@@ -267,6 +277,18 @@ def refresh_index_valuation_snapshot(
     summary.valuation_pe_ttm_avg_10y = _as_float(remote.get("pe_ttm_avg_10y"))
 
 
+def refresh_index_daily_metrics(
+    conn: Any,
+    index_code: str,
+    *,
+    summary: SyncSummary,
+    time_interval: str = "last_10_years",
+) -> None:
+    """拉取并 upsert 指数 PE/PB 日序列到 index_daily_metrics。"""
+    rows = fetch_index_daily_metrics_bundle(index_code, time_interval=time_interval)
+    summary.index_metric_rows = upsert_index_daily_metrics(conn, rows)
+
+
 def refresh_index_industry_weights(
     conn: Any,
     index_code: str,
@@ -312,7 +334,11 @@ def run(
                 "end": (end or date.today()).isoformat(),
             },
         )
-        ensure_index_row(conn, code=index_code, name=DEFAULT_INDEX_NAME)
+        ensure_index_row(
+            conn,
+            code=index_code,
+            name=INDEX_DISPLAY_NAMES.get(index_code, DEFAULT_INDEX_NAME),
+        )
 
         if mode != "valuation-only":
             remote_etf = fetch_etf_daily_bundle(etf_code, end=end, max_bars=max_bars)
@@ -323,6 +349,7 @@ def run(
                 conn, index_code, remote_weights, summary=summary
             )
 
+        refresh_index_daily_metrics(conn, index_code, summary=summary)
         remote_val = fetch_index_pe_snapshot(index_code)
         refresh_index_valuation_snapshot(
             conn, index_code, remote_val, epsilon=epsilon, summary=summary
@@ -375,7 +402,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--mode",
         choices=("incremental", "full", "valuation-only"),
         default="incremental",
-        help="incremental=近 N 根(默认快)；full=全历史；valuation-only=只刷 PE 快照",
+        help="incremental=近 N 根(默认快)；full=全历史；valuation-only=只刷估值快照+日序列",
     )
     parser.add_argument(
         "--lookback-bars",
@@ -408,6 +435,7 @@ def main(argv: list[str] | None = None) -> int:
         f"idx_px_filled={summary.index_price_filled} "
         f"val_pe={summary.valuation_current_pe_ttm} "
         f"avg5y={summary.valuation_pe_ttm_avg_5y} avg10y={summary.valuation_pe_ttm_avg_10y} "
+        f"metric_rows={summary.index_metric_rows} "
         f"industry_rows={summary.industry_weight_rows} as_of={summary.industry_weight_as_of}"
     )
     return 0 if summary.status == "success" else 1

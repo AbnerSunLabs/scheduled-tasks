@@ -1,9 +1,9 @@
-name: 同步汇率到 Supabase
+name: 同步指数估值到 Supabase
 
 on:
   schedule:
-    # 工作日北京时间约 23:30（ECB 约 16:00 CET 已发布）
-    - cron: "30 15 * * 1-5"
+    # 工作日北京时间约 19:15（ETF 日 K 之后）
+    - cron: "15 11 * * 1-5"
   workflow_dispatch:
     inputs:
       mode:
@@ -11,32 +11,30 @@ on:
         required: true
         type: choice
         options:
+          - valuation-only
           - incremental
           - full
-        default: incremental
-      lookback_days:
-        description: "incremental 回看天数"
+        default: valuation-only
+      etf_code:
+        description: "ETF 代码"
         required: false
         type: string
-        default: "7"
-      start:
-        description: "可选起始日 YYYY-MM-DD"
+        default: "510300"
+      index_code:
+        description: "指数代码"
         required: false
         type: string
-      end:
-        description: "可选结束日 YYYY-MM-DD"
-        required: false
-        type: string
+        default: "000300.SH"
 
 permissions:
   contents: read
 
 jobs:
-  sync-fx:
+  sync-index-valuation:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     concurrency:
-      group: sync-fx-rates
+      group: sync-index-valuation
       cancel-in-progress: false
 
     steps:
@@ -66,42 +64,38 @@ jobs:
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             echo "mode=${{ inputs.mode }}" >> "$GITHUB_OUTPUT"
+            echo "etf_code=${{ inputs.etf_code }}" >> "$GITHUB_OUTPUT"
+            echo "index_code=${{ inputs.index_code }}" >> "$GITHUB_OUTPUT"
           else
-            echo "mode=incremental" >> "$GITHUB_OUTPUT"
+            echo "mode=valuation-only" >> "$GITHUB_OUTPUT"
+            echo "etf_code=510300" >> "$GITHUB_OUTPUT"
+            echo "index_code=000300.SH" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Sync FX rates
+      - name: Sync index valuation
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           SYNC_MODE: ${{ steps.mode.outputs.mode }}
-          INPUT_LOOKBACK: ${{ inputs.lookback_days }}
-          INPUT_START: ${{ inputs.start }}
-          INPUT_END: ${{ inputs.end }}
+          ETF_CODE: ${{ steps.mode.outputs.etf_code }}
+          INDEX_CODE: ${{ steps.mode.outputs.index_code }}
         run: |
           set -euo pipefail
           mkdir -p artifacts
-          args=(--mode="$SYNC_MODE")
-          if [ -n "${INPUT_LOOKBACK:-}" ]; then
-            args+=(--lookback-days="$INPUT_LOOKBACK")
-          fi
-          if [ -n "${INPUT_START:-}" ]; then
-            args+=(--start="$INPUT_START")
-          fi
-          if [ -n "${INPUT_END:-}" ]; then
-            args+=(--end="$INPUT_END")
-          fi
-          python -m scheduled_tasks.jobs.sync_fx_rates_frankfurter "${args[@]}"
+          python -m scheduled_tasks.jobs.sync_hongsehuojian_fill_validate \
+            --mode="$SYNC_MODE" \
+            --etf-code="$ETF_CODE" \
+            --index-code="$INDEX_CODE"
 
       - name: Upload summary artifact
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: sync-fx-summary
-          path: artifacts/sync_fx_rates_summary.json
+          name: sync-index-valuation-summary
+          path: artifacts/sync_hongsehuojian_fill_validate_summary.json
           if-no-files-found: warn
 
   notify-bark:
-    needs: sync-fx
+    needs: sync-index-valuation
     if: always()
     runs-on: ubuntu-latest
     steps:
@@ -109,13 +103,13 @@ jobs:
         uses: actions/download-artifact@v4
         continue-on-error: true
         with:
-          name: sync-fx-summary
+          name: sync-index-valuation-summary
           path: artifacts
 
       - name: Push Bark notification
         env:
           BARK_KEY: ${{ secrets.BARK_KEY }}
-          JOB_RESULT: ${{ needs.sync-fx.result }}
+          JOB_RESULT: ${{ needs.sync-index-valuation.result }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           set -euo pipefail
@@ -124,35 +118,34 @@ jobs:
             exit 0
           fi
 
-          summary_file="artifacts/sync_fx_rates_summary.json"
+          summary_file="artifacts/sync_hongsehuojian_fill_validate_summary.json"
           if [ -f "$summary_file" ]; then
             eval "$(python - <<'PY'
           import json
-          d = json.load(open("artifacts/sync_fx_rates_summary.json", encoding="utf-8"))
+          d = json.load(open("artifacts/sync_hongsehuojian_fill_validate_summary.json", encoding="utf-8"))
           def esc(v):
               return str(v).replace("'", "'\\''")
-          print(f"mode='{esc(d.get('mode',''))}'")
           print(f"status='{esc(d.get('status',''))}'")
-          print(f"success_count='{esc(d.get('success_count',0))}'")
-          print(f"failure_count='{esc(d.get('failure_count',0))}'")
-          print(f"upserted_rows='{esc(d.get('upserted_rows',0))}'")
-          print(f"max_rate_date='{esc(d.get('max_rate_date') or '-')}'")
+          print(f"index_code='{esc(d.get('index_code',''))}'")
+          print(f"valuation_trade_date='{esc(d.get('valuation_trade_date') or '-')}'")
+          print(f"valuation_current_pe_ttm='{esc(d.get('valuation_current_pe_ttm') or '-')}'")
+          print(f"index_metric_rows='{esc(d.get('index_metric_rows',0))}'")
           PY
           )"
             case "$status" in
-              success) title="汇率同步成功" ;;
-              partial) title="汇率同步部分成功" ;;
-              *) title="汇率同步失败" ;;
+              success) title="指数估值同步成功" ;;
+              partial) title="指数估值同步部分成功" ;;
+              *) title="指数估值同步失败" ;;
             esac
-            body="job=sync_fx_rates_frankfurter mode=${mode} status=${status} days=${success_count} fail=${failure_count} rows=${upserted_rows} max_date=${max_rate_date}
+            body="job=sync_hongsehuojian_fill_validate index=${index_code} status=${status} trade_date=${valuation_trade_date} pe=${valuation_current_pe_ttm} metric_rows=${index_metric_rows}
           ${RUN_URL}"
           else
             case "$JOB_RESULT" in
-              success) title="汇率同步成功" ;;
-              cancelled) title="汇率同步取消" ;;
-              *) title="汇率同步失败" ;;
+              success) title="指数估值同步成功" ;;
+              cancelled) title="指数估值同步取消" ;;
+              *) title="指数估值同步失败" ;;
             esac
-            body="job=sync_fx_rates_frankfurter result=${JOB_RESULT} summary missing
+            body="job=sync_hongsehuojian_fill_validate result=${JOB_RESULT} summary missing
           ${RUN_URL}"
           fi
 

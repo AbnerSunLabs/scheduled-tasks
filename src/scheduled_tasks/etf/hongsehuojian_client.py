@@ -355,17 +355,21 @@ def _mean_positive_valuations(items: list[Any]) -> float | None:
     return sum(vals) / len(vals)
 
 
-def _fetch_pe_window(
+def _fetch_valuation_window(
     security_code: str,
+    valuation_type: str,
     time_interval: str,
     *,
     base_url: str,
 ) -> dict[str, Any]:
+    metric = valuation_type.strip().upper()
+    if metric not in {"PE", "PB"}:
+        raise ValueError(f"unsupported valuation_type: {valuation_type}")
     data = _api_get(
         "/fundex-quote/index/valuation",
         {
             "securityCode": security_code,
-            "valuationType": "PE",
+            "valuationType": metric,
             "timeInterval": time_interval,
         },
         base_url=base_url,
@@ -374,6 +378,103 @@ def _fetch_pe_window(
     if not isinstance(items, list):
         raise RuntimeError("valuation items must be a list")
     return data
+
+
+def _fetch_pe_window(
+    security_code: str,
+    time_interval: str,
+    *,
+    base_url: str,
+) -> dict[str, Any]:
+    return _fetch_valuation_window(security_code, "PE", time_interval, base_url=base_url)
+
+
+def fetch_index_valuation_history(
+    index_code: str,
+    valuation_type: str,
+    *,
+    time_interval: str = "last_10_years",
+    base_url: str = DEFAULT_BASE_URL,
+) -> list[dict[str, Any]]:
+    """拉取指数 PE 或 PB 日序列，映射为 index_daily_metrics 行片段。"""
+    metric = valuation_type.strip().upper()
+    field = "pe_ttm" if metric == "PE" else "pb"
+    if metric not in {"PE", "PB"}:
+        raise ValueError(f"unsupported valuation_type: {valuation_type}")
+    security = to_security_code(index_code, kind="index")
+    data = _fetch_valuation_window(security, metric, time_interval, base_url=base_url)
+    out: list[dict[str, Any]] = []
+    for item in data.get("items") or []:
+        if not isinstance(item, dict):
+            continue
+        value = _num(item.get("valuationValue"))
+        if value is None or value <= 0:
+            continue
+        row: dict[str, Any] = {
+            "index_code": index_code,
+            "trade_date": parse_trade_date(item["tradeDate"]),
+            "close": None,
+            "pe_ttm": None,
+            "pb": None,
+            "price_source": None,
+            "valuation_source": "hongsehuojian",
+        }
+        row[field] = value
+        out.append(row)
+    return out
+
+
+def merge_index_metric_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """按 (index_code, trade_date) 合并 close/PE/PB 片段行。"""
+    merged: dict[tuple[str, date], dict[str, Any]] = {}
+    for row in rows:
+        key = (str(row["index_code"]), row["trade_date"])
+        target = merged.setdefault(
+            key,
+            {
+                "index_code": row["index_code"],
+                "trade_date": row["trade_date"],
+                "close": None,
+                "pe_ttm": None,
+                "pb": None,
+                "price_source": None,
+                "valuation_source": None,
+            },
+        )
+        for field_name in ("close", "pe_ttm", "pb", "price_source", "valuation_source"):
+            value = row.get(field_name)
+            if value is not None:
+                target[field_name] = value
+    return [merged[key] for key in sorted(merged.keys(), key=lambda item: (item[0], item[1]))]
+
+
+def fetch_index_daily_metrics_bundle(
+    index_code: str,
+    *,
+    time_interval: str = "last_10_years",
+    base_url: str = DEFAULT_BASE_URL,
+) -> list[dict[str, Any]]:
+    """并行拉取 PE/PB 历史并合并为日指标行。"""
+    from concurrent.futures import ThreadPoolExecutor
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        fut_pe = pool.submit(
+            fetch_index_valuation_history,
+            index_code,
+            "PE",
+            time_interval=time_interval,
+            base_url=base_url,
+        )
+        fut_pb = pool.submit(
+            fetch_index_valuation_history,
+            index_code,
+            "PB",
+            time_interval=time_interval,
+            base_url=base_url,
+        )
+        pe_rows = fut_pe.result()
+        pb_rows = fut_pb.result()
+    return merge_index_metric_rows([*pe_rows, *pb_rows])
 
 
 def fetch_index_pe_snapshot(

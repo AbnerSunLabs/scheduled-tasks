@@ -7,10 +7,11 @@ name: 应用驾驶舱 Migration
 #   2. 20260715_rename_etf_pool_snapshots_to_etf_pool.sql（独立步骤，幂等）
 #   3. 20260719_rename_etf_valuation_to_index_valuation.sql（独立步骤，幂等）
 #   4. 清理 migrations（drop amount 列 + drop trade_calendar；独立步骤）
+#   5. 20260721_drop_fx_rates.sql（独立步骤，幂等；下线汇率表）
 #
 # Live 部署边界：
 #   - 须受控生产窗口 + 明确人工授权后手动触发本 workflow；代码合并 ≠ 已部署。
-#   - 两个 rename 与 cleanup migration 均须分批执行（多选由 Guard 步骤硬失败）。
+#   - rename / cleanup / drop_fx 均须分批执行（多选由 Guard 步骤硬失败）。
 
 on:
   workflow_dispatch:
@@ -27,6 +28,11 @@ on:
         default: false
       apply_index_valuation_rename_migration:
         description: "执行 etf_valuation → index_valuation rename（须单独授权）"
+        required: true
+        type: boolean
+        default: false
+      apply_drop_fx_rates_migration:
+        description: "删除 fx_rates 表（须单独授权）"
         required: true
         type: boolean
         default: false
@@ -47,16 +53,17 @@ jobs:
           APPLY_RENAME: ${{ inputs.apply_rename_migration }}
           APPLY_CLEANUP: ${{ inputs.apply_cleanup_migration }}
           APPLY_INDEX_VALUATION_RENAME: ${{ inputs.apply_index_valuation_rename_migration }}
+          APPLY_DROP_FX: ${{ inputs.apply_drop_fx_rates_migration }}
         run: |
           set -euo pipefail
           selected=0
-          for flag in "$APPLY_RENAME" "$APPLY_CLEANUP" "$APPLY_INDEX_VALUATION_RENAME"; do
+          for flag in "$APPLY_RENAME" "$APPLY_CLEANUP" "$APPLY_INDEX_VALUATION_RENAME" "$APPLY_DROP_FX"; do
             if [ "$flag" = "true" ]; then
               selected=$((selected + 1))
             fi
           done
           if [ "$selected" -gt 1 ]; then
-            echo "::error::rename / cleanup migration 互斥，须分次 workflow run 单独授权，不得同批勾选"
+            echo "::error::rename / cleanup / drop_fx migration 互斥，须分次 workflow run 单独授权，不得同批勾选"
             exit 1
           fi
 
@@ -72,7 +79,7 @@ jobs:
             exit 1
           fi
 
-      - name: Apply cockpit ledger + fx_rates migration
+      - name: Apply cockpit ledger migration
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: |
@@ -83,7 +90,7 @@ jobs:
             -f src/scheduled_tasks/models/migrations/20260718_etf_pool_authenticated_read.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 \
             -f src/scheduled_tasks/models/migrations/20260718_index_market_anon_read.sql
-          echo "cockpit ledger + fx_rates + shared market read migrations applied"
+          echo "cockpit ledger + shared market read migrations applied"
 
       - name: Verify cockpit ledger tables exist
         env:
@@ -97,8 +104,7 @@ jobs:
               and tablename in (
                 'portfolio_settings', 'target_allocations', 'etf_instruments', 'positions',
                 'trade_records', 'cash_flows', 'cash_accounts', 'rebalance_plans',
-                'grid_plans', 'review_entries', 'decision_logs', 'portfolio',
-                'fx_rates'
+                'grid_plans', 'review_entries', 'decision_logs', 'portfolio'
               )
             order by tablename;
           "
@@ -206,3 +212,27 @@ jobs:
             exit 1
           fi
           echo "cleanup verification passed"
+
+      - name: Apply drop fx_rates migration
+        if: inputs.apply_drop_fx_rates_migration == true
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          set -euo pipefail
+          echo "Dropping public.fx_rates (standalone)"
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 \
+            -f src/scheduled_tasks/models/migrations/20260721_drop_fx_rates.sql
+          echo "drop fx_rates migration applied"
+
+      - name: Verify fx_rates dropped (readonly)
+        if: inputs.apply_drop_fx_rates_migration == true
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          set -euo pipefail
+          fx="$(psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -At -c "select coalesce(to_regclass('public.fx_rates')::text, '');")"
+          if [ -n "$fx" ]; then
+            echo "::error::public.fx_rates still exists"
+            exit 1
+          fi
+          echo "fx_rates drop verification passed"
