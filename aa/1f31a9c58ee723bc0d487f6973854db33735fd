@@ -1,0 +1,41 @@
+.github/workflows/apply-cockpit-migration.yml
+  s_52fcd213956209::t_bef560b33418e4 10,14,34-38,56,60,66,82,93,107,215-238
+.github/workflows/sync-index-valuation.yml
+  s_52fcd213956209::t_045c21853984f3 1,5-6,14,17-19,22-24,27,33,35,37,67-68,70-72,75,79-80,84-87,93-94,98,106,112,121,125,129-132,136-138,140,144-146,148
+README.md
+  s_52fcd213956209::t_04b438df71400f 3,5,7,17,19,21-27,29,31-32,41-43,45,67,75,78,81,83,86,90,94,96,99-101,103,107,110-113
+doc/hongsehuojian-fill-validate.md
+  s_52fcd213956209::t_e6c54aef897a5a 13-16,25-28,37,48,50-52,59,61,63,65-68
+doc/supabase-schema.md
+  s_52fcd213956209::t_d8b1d2bf8b6845 5-8,18,26-38,46-121,124,130,160-169,183,187-219,223-231,239,241-248,252-257,286,310-320,386-388,508,522-536
+docs/superpowers/specs/2026-07-21-drop-fx-add-index-valuation-gha.md
+  s_52fcd213956209::t_bccdec4e6170e4 1-34
+src/scheduled_tasks/db.py
+  s_52fcd213956209::t_3a244bfc7ca8a4 596-629
+src/scheduled_tasks/etf/hongsehuojian_client.py
+  s_52fcd213956209::t_d21ec64a4ac7d6 358,360,365-367,372,383-479
+src/scheduled_tasks/jobs/sync_hongsehuojian_fill_validate.py
+  s_52fcd213956209::t_fcc129dc758fbe 6,33,38,53-57,102,129,280-291,337-341,352,405,438
+src/scheduled_tasks/models/migrations/20260721_drop_fx_rates.sql
+  s_52fcd213956209::t_14315ab85f9725 1-10
+src/scheduled_tasks/models/schema.sql
+  s_52fcd213956209::t_b6b3179cddb20d 115
+tests/test_hongsehuojian.py
+  s_52fcd213956209::t_7f35dbd3a687de 13,276,303-305,320,324-378
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "aa1f31a9c58ee723bc0d487f6973854db33735fd",
+  "prompts": {},
+  "sessions": {
+    "s_52fcd213956209": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "b6fab1fb-5c95-4d0c-ad3d-6635dd69a307",
+        "model": "unknown"
+      },
+      "human_author": "AbnerSun <sunyujiejohn@sina.com>"
+    }
+  }
+}
