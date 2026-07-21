@@ -322,7 +322,7 @@ def fetch_index_daily_prices(
     max_bars: int | None = None,
     base_url: str = DEFAULT_BASE_URL,
 ) -> list[dict[str, Any]]:
-    """拉取指数日收盘（远程）；库表已删除，仅供临时探查。"""
+    """拉取指数日收盘，映射为 index_daily_metrics 行片段。"""
     security = to_security_code(index_code, kind="index")
     rows = fetch_kline_history(
         security, adjust=ADJUST_NONE, end=end, max_bars=max_bars, base_url=base_url
@@ -337,6 +337,10 @@ def fetch_index_daily_prices(
                 "index_code": index_code,
                 "trade_date": parse_trade_date(row["tradeDate"]),
                 "close": close,
+                "pe_ttm": None,
+                "pb": None,
+                "price_source": PRICE_SOURCE,
+                "valuation_source": None,
             }
         )
     return out
@@ -452,12 +456,15 @@ def fetch_index_daily_metrics_bundle(
     index_code: str,
     *,
     time_interval: str = "last_10_years",
+    include_prices: bool = True,
+    max_price_bars: int | None = None,
+    end: date | None = None,
     base_url: str = DEFAULT_BASE_URL,
 ) -> list[dict[str, Any]]:
-    """并行拉取 PE/PB 历史并合并为日指标行。"""
+    """并行拉取 PE/PB（及可选收盘）历史并合并为日指标行。"""
     from concurrent.futures import ThreadPoolExecutor
 
-    with ThreadPoolExecutor(max_workers=2) as pool:
+    with ThreadPoolExecutor(max_workers=3) as pool:
         fut_pe = pool.submit(
             fetch_index_valuation_history,
             index_code,
@@ -472,9 +479,21 @@ def fetch_index_daily_metrics_bundle(
             time_interval=time_interval,
             base_url=base_url,
         )
+        fut_px = (
+            pool.submit(
+                fetch_index_daily_prices,
+                index_code,
+                end=end,
+                max_bars=max_price_bars,
+                base_url=base_url,
+            )
+            if include_prices
+            else None
+        )
         pe_rows = fut_pe.result()
         pb_rows = fut_pb.result()
-    return merge_index_metric_rows([*pe_rows, *pb_rows])
+        price_rows = fut_px.result() if fut_px is not None else []
+    return merge_index_metric_rows([*pe_rows, *pb_rows, *price_rows])
 
 
 def fetch_index_pe_snapshot(

@@ -283,9 +283,16 @@ def refresh_index_daily_metrics(
     *,
     summary: SyncSummary,
     time_interval: str = "last_10_years",
+    include_prices: bool = True,
+    max_price_bars: int | None = None,
 ) -> None:
-    """拉取并 upsert 指数 PE/PB 日序列到 index_daily_metrics。"""
-    rows = fetch_index_daily_metrics_bundle(index_code, time_interval=time_interval)
+    """拉取并 upsert 指数 PE/PB（及收盘）日序列到 index_daily_metrics。"""
+    rows = fetch_index_daily_metrics_bundle(
+        index_code,
+        time_interval=time_interval,
+        include_prices=include_prices,
+        max_price_bars=max_price_bars,
+    )
     summary.index_metric_rows = upsert_index_daily_metrics(conn, rows)
 
 
@@ -349,7 +356,15 @@ def run(
                 conn, index_code, remote_weights, summary=summary
             )
 
-        refresh_index_daily_metrics(conn, index_code, summary=summary)
+        # valuation-only 也拉近期收盘，避免「最新收盘」停在更早交易日。
+        price_bars = None if mode == "full" else (lookback_bars if mode == "incremental" else 60)
+        refresh_index_daily_metrics(
+            conn,
+            index_code,
+            summary=summary,
+            include_prices=True,
+            max_price_bars=price_bars,
+        )
         remote_val = fetch_index_pe_snapshot(index_code)
         refresh_index_valuation_snapshot(
             conn, index_code, remote_val, epsilon=epsilon, summary=summary
