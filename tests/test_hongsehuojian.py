@@ -344,12 +344,23 @@ def test_merge_index_metric_rows_combines_pe_and_pb() -> None:
                 "price_source": None,
                 "valuation_source": "hongsehuojian",
             },
+            {
+                "index_code": "000300.SH",
+                "trade_date": date(2026, 7, 20),
+                "close": 4600.0,
+                "pe_ttm": None,
+                "pb": None,
+                "price_source": "hongsehuojian",
+                "valuation_source": None,
+            },
         ]
     )
     assert len(rows) == 1
     assert rows[0]["pe_ttm"] == 14.3
     assert rows[0]["pb"] == 1.45
+    assert rows[0]["close"] == 4600.0
     assert rows[0]["valuation_source"] == "hongsehuojian"
+    assert rows[0]["price_source"] == "hongsehuojian"
 
 
 def test_upsert_index_daily_metrics_sql_shape() -> None:
