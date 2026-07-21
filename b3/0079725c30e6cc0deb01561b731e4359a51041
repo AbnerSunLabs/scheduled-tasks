@@ -1,0 +1,19 @@
+tests/test_hongsehuojian.py
+  s_52fcd213956209::t_7bbe0c64ec8383 347-355,361,363
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "b30079725c30e6cc0deb01561b731e4359a51041",
+  "prompts": {},
+  "sessions": {
+    "s_52fcd213956209": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "b6fab1fb-5c95-4d0c-ad3d-6635dd69a307",
+        "model": "unknown"
+      },
+      "human_author": "AbnerSun <sunyujiejohn@sina.com>"
+    }
+  }
+}
