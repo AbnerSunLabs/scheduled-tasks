@@ -23,6 +23,12 @@ DEFAULT_BASE_URL = "https://www.hongsehuojian.com"
 PRICE_SOURCE = "hongsehuojian"
 VALUATION_SOURCE = "hongsehuojian"
 
+# 红色火箭 /fundex-quote/index/valuation 的 timeInterval
+VALUATION_INTERVAL_MAX = "max"  # 上市以来全量
+VALUATION_INTERVAL_RECENT = "last_10_years"  # 增量默认窗口
+VALUATION_INTERVAL_5Y = "last_5_years"
+VALUATION_INTERVAL_10Y = "last_10_years"
+
 # kline adjust: 0 不复权 / 1 前复权 / 2 后复权
 ADJUST_NONE = "0"
 ADJUST_QFQ = "1"
@@ -397,10 +403,14 @@ def fetch_index_valuation_history(
     index_code: str,
     valuation_type: str,
     *,
-    time_interval: str = "last_10_years",
+    time_interval: str = VALUATION_INTERVAL_RECENT,
     base_url: str = DEFAULT_BASE_URL,
 ) -> list[dict[str, Any]]:
-    """拉取指数 PE 或 PB 日序列，映射为 index_daily_metrics 行片段。"""
+    """拉取指数 PE 或 PB 日序列，映射为 index_daily_metrics 行片段。
+
+    ``time_interval`` 传给红色火箭 ``timeInterval``：``max``=全量，
+    ``last_10_years`` / ``last_5_years`` 为滚动窗口。
+    """
     metric = valuation_type.strip().upper()
     field = "pe_ttm" if metric == "PE" else "pb"
     if metric not in {"PE", "PB"}:
@@ -455,7 +465,7 @@ def merge_index_metric_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
 def fetch_index_daily_metrics_bundle(
     index_code: str,
     *,
-    time_interval: str = "last_10_years",
+    time_interval: str = VALUATION_INTERVAL_RECENT,
     include_prices: bool = True,
     max_price_bars: int | None = None,
     end: date | None = None,
@@ -509,8 +519,8 @@ def fetch_index_pe_snapshot(
 
     security = to_security_code(index_code, kind="index")
     with ThreadPoolExecutor(max_workers=2) as pool:
-        fut_5y = pool.submit(_fetch_pe_window, security, "last_5_years", base_url=base_url)
-        fut_10y = pool.submit(_fetch_pe_window, security, "last_10_years", base_url=base_url)
+        fut_5y = pool.submit(_fetch_pe_window, security, VALUATION_INTERVAL_5Y, base_url=base_url)
+        fut_10y = pool.submit(_fetch_pe_window, security, VALUATION_INTERVAL_10Y, base_url=base_url)
         pe_5y = fut_5y.result()
         pe_10y = fut_10y.result()
 

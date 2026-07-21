@@ -8,20 +8,23 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
+from scheduled_tasks.jobs.sync_hongsehuojian_fill_validate import (
+    compare_etf_row,
+    fill_and_validate_etf,
+    filter_unfinalized_closes,
+    is_final_ashare_close_date,
+    valuation_time_interval_for_mode,
+    values_mismatch,
+)
 from scheduled_tasks.etf.hongsehuojian_client import (
+    VALUATION_INTERVAL_MAX,
+    VALUATION_INTERVAL_RECENT,
     _mean_positive_valuations,
     build_etf_daily_rows,
     merge_index_metric_rows,
     parse_kline_items,
     parse_trade_date,
     to_security_code,
-)
-from scheduled_tasks.jobs.sync_hongsehuojian_fill_validate import (
-    compare_etf_row,
-    fill_and_validate_etf,
-    filter_unfinalized_closes,
-    is_final_ashare_close_date,
-    values_mismatch,
 )
 
 
@@ -321,9 +324,18 @@ def test_valuation_only_skips_industry_weights() -> None:
     assert out.status == "success"
     upsert_pe.assert_called_once()
     refresh_metrics.assert_called_once()
+    assert refresh_metrics.call_args.kwargs["time_interval"] == VALUATION_INTERVAL_MAX
     fetch_w.assert_not_called()
     refresh_w.assert_not_called()
     fetch_etf.assert_not_called()
+
+
+def test_valuation_time_interval_for_mode() -> None:
+    assert valuation_time_interval_for_mode("full") == VALUATION_INTERVAL_MAX
+    assert valuation_time_interval_for_mode("valuation-only") == VALUATION_INTERVAL_MAX
+    assert valuation_time_interval_for_mode("incremental") == VALUATION_INTERVAL_RECENT
+    with pytest.raises(ValueError):
+        valuation_time_interval_for_mode("unknown")
 
 
 def test_merge_index_metric_rows_combines_pe_and_pb() -> None:

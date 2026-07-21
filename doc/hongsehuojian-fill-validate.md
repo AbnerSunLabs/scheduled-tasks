@@ -46,17 +46,20 @@ unset DATABASE_URL   # 如需强制用 .env
 # 默认 incremental（近 30 根，较快）
 python3 -m scheduled_tasks.jobs.sync_hongsehuojian_fill_validate
 # 只刷估值（快照 + PE/PB 日序列；不拉 K 线、不刷新行业权重）
+# full / valuation-only 使用 timeInterval=max 拉全量估值；incremental 用 last_10_years
 python3 -m scheduled_tasks.jobs.sync_hongsehuojian_fill_validate --mode=valuation-only
-# 沪深 300（GHA 默认标的）
+# 沪深 300（GHA 默认标的；会回填上市以来 PE/PB）
 python3 -m scheduled_tasks.jobs.sync_hongsehuojian_fill_validate \
   --mode=valuation-only --etf-code=510300 --index-code=000300.SH
-# 首次补全历史（含行业权重刷新）
+# 首次补全历史（含行业权重刷新 + 全量估值）
 python3 -m scheduled_tasks.jobs.sync_hongsehuojian_fill_validate --mode=full
 ```
 
 摘要：`artifacts/sync_hongsehuojian_fill_validate_summary.json`
 
-`valuation-only` upsert `index_valuation` + `index_daily_metrics` PE/PB；**不**拉 K 线、**不**刷新 `index_industry_weights`。
+`valuation-only` upsert `index_valuation` + `index_daily_metrics` PE/PB（`timeInterval=max`）；**不**拉长 K、**不**刷新 `index_industry_weights`。
+
+红色火箭估值窗口：`max`（全量）、`last_10_years`、`last_5_years`。
 
 GHA：`同步指数估值到 Supabase`（工作日北京约 19:15；默认沪深 300；仅 Bark 通知）。
 
