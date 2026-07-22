@@ -47,8 +47,8 @@ python3 -m scheduled_tasks.jobs.sync_official_cross_check --apply-official --yes
 
 Workflow：`.github/workflows/sync-official-cross-check.yml`
 
-- 定时：工作日北京约 20:00（ETF 日 K 之后），默认 `--from-pool` **只比对**
-- 手动：`workflow_dispatch` 可改 mode / from_pool / etf_code
+- 定时：工作日北京约 20:00（ETF 日 K 之后），默认 `--from-pool` **只比对**；定时启动前做 A 股交易日闸门（休市跳过，见 [ashare-trading-day-gate.md](./ashare-trading-day-gate.md)）
+- 手动：`workflow_dispatch`（手动触发）可改 mode / from_pool / etf_code，**不**做交易日闸门
 - **不会**自动 `--apply-official`；纠偏需本地显式确认
 - 退出码：仅 **价差 mismatch** 或整次失败 → 非 0；个别源瞬时断连但已有有效比对 → 0（summary 仍可能 `partial`）
 - `sync_runs.success_codes`：仅含源拉取/校验完成的标的；SSE/中证失败的代码不计入（`success_count` 同口径）

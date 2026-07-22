@@ -38,6 +38,12 @@ jobs:
     concurrency:
       group: sync-etf-kline
       cancel-in-progress: false
+    outputs:
+      should_run: ${{ steps.gate.outputs.should_run }}
+      is_trading_day: ${{ steps.gate.outputs.is_trading_day }}
+      cal_date: ${{ steps.gate.outputs.cal_date }}
+      calendar_error: ${{ steps.gate.outputs.error }}
+      calendar_source: ${{ steps.gate.outputs.source }}
 
     steps:
       - name: Checkout code
@@ -76,7 +82,15 @@ jobs:
             fi
           fi
 
+      # 仅工作日 schedule 的 incremental 查交易日；手动 / 周日 adj_check 放行
+      - name: Check A-share trading day
+        id: gate
+        uses: ./.github/actions/check-ashare-trading-day
+        with:
+          enabled: ${{ github.event_name == 'schedule' && steps.mode.outputs.mode == 'incremental' }}
+
       - name: Sync ETF kline
+        if: steps.gate.outputs.should_run == 'true'
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           SYNC_MODE: ${{ steps.mode.outputs.mode }}
@@ -95,7 +109,7 @@ jobs:
           python -m scheduled_tasks.jobs.sync_etf_kline_yfinance "${args[@]}"
 
       - name: Upload summary artifact
-        if: always()
+        if: always() && steps.gate.outputs.should_run == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: sync-etf-summary
@@ -108,6 +122,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Download summary artifact
+        if: needs.sync-etf.outputs.should_run == 'true'
         uses: actions/download-artifact@v4
         continue-on-error: true
         with:
@@ -119,6 +134,10 @@ jobs:
           BARK_KEY: ${{ secrets.BARK_KEY }}
           JOB_RESULT: ${{ needs.sync-etf.result }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          IS_TRADING_DAY: ${{ needs.sync-etf.outputs.is_trading_day }}
+          CAL_DATE: ${{ needs.sync-etf.outputs.cal_date }}
+          CALENDAR_ERROR: ${{ needs.sync-etf.outputs.calendar_error }}
+          CALENDAR_SOURCE: ${{ needs.sync-etf.outputs.calendar_source }}
         run: |
           set -euo pipefail
           if [ -z "${BARK_KEY:-}" ]; then
@@ -126,7 +145,37 @@ jobs:
             exit 0
           fi
 
+          if [ "${IS_TRADING_DAY:-}" = "false" ]; then
+            title="ETF日K今日休市已跳过"
+            body="job=sync_etf_kline_yfinance cal_date=${CAL_DATE:-?} source=${CALENDAR_SOURCE:-?}
+          ${RUN_URL}"
+            export BARK_TITLE="$title"
+            export BARK_BODY="$body"
+            python - <<'PY'
+          import json, os, urllib.request
+          payload = {
+              "device_key": os.environ["BARK_KEY"],
+              "title": os.environ["BARK_TITLE"],
+              "body": os.environ["BARK_BODY"],
+              "group": "scheduled-tasks",
+          }
+          req = urllib.request.Request(
+              "https://api.day.app/push",
+              data=json.dumps(payload).encode("utf-8"),
+              headers={"Content-Type": "application/json"},
+              method="POST",
+          )
+          with urllib.request.urlopen(req, timeout=30) as resp:
+              print(resp.read().decode("utf-8", errors="replace"))
+          PY
+            exit 0
+          fi
+
           summary_file="artifacts/sync_etf_kline_summary.json"
+          cal_warn=""
+          if [ "${IS_TRADING_DAY:-}" = "unknown" ]; then
+            cal_warn="【交易日历查询失败，已按交易日继续跑 error=${CALENDAR_ERROR:-?}】 "
+          fi
           if [ -f "$summary_file" ]; then
             eval "$(python - <<'PY'
           import json
@@ -151,7 +200,7 @@ jobs:
               partial) title="ETF日K同步部分成功" ;;
               *) title="ETF日K同步失败" ;;
             esac
-            body="job=sync_etf_kline_yfinance mode=${mode} status=${status} success=${success_count} fail=${failure_count} pool=${pool_size} max_date=${max_trade_date} refreshed=${refreshed} skipped=${skipped} detect_failed=${detect_failed} needs_full=${needs_full} adj_gap=${adj_gap}
+            body="${cal_warn}job=sync_etf_kline_yfinance mode=${mode} status=${status} success=${success_count} fail=${failure_count} pool=${pool_size} max_date=${max_trade_date} refreshed=${refreshed} skipped=${skipped} detect_failed=${detect_failed} needs_full=${needs_full} adj_gap=${adj_gap}
           ${RUN_URL}"
           else
             case "$JOB_RESULT" in
@@ -159,7 +208,7 @@ jobs:
               cancelled) title="ETF日K同步取消" ;;
               *) title="ETF日K同步失败" ;;
             esac
-            body="job=sync_etf_kline_yfinance result=${JOB_RESULT} summary missing
+            body="${cal_warn}job=sync_etf_kline_yfinance result=${JOB_RESULT} summary missing
           ${RUN_URL}"
           fi
 

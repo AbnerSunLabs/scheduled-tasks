@@ -1,0 +1,33 @@
+---
+description: 对用户提及技术标识时必须附带中文释义
+alwaysApply: true
+---
+
+# 标识名必须带中文
+
+对用户说话时，凡出现**字段 / 列 / 参数 / 表 / job / workflow / 模式名 / 配置键**等技术标识，必须同时给出中文释义；禁止只甩英文或 snake_case。
+
+## 要求
+
+1. **成对出现**：`英文标识（中文）`，或「中文（`英文标识`）」二选一，同一回复内风格一致即可。
+2. **覆盖范围**：数据库列、表名、CLI/环境变量、`JOB_NAME`、workflow 文件名、sync mode、API 字段、JSON key 等。
+3. **首次与复提**：同一标识在**同一回复首次出现**时必须带中文；后文若连续复用可简写，但换段落或易混时再带一次。
+4. **文档与注释**：写入 README / `doc/**` / 用户可见文案时同样遵守；代码标识本身仍用英文。
+
+## 反例 / 正例
+
+```text
+❌ 只拦 schedule；workflow_dispatch 放行；周日 adj_check 不加
+✅ 只拦 schedule（定时触发）；workflow_dispatch（手动触发）放行；周日 adj_check（复权巡检）不加
+
+❌ 看 trade_date 和 is_open
+✅ 看 trade_date（交易日）和 is_open（是否开市）
+
+❌ mode=incremental
+✅ mode=incremental（增量同步）
+```
+
+## 自检
+
+- [ ] 本回复里每个首次出现的技术标识是否都有中文？
+- [ ] 用户能否不查代码就懂这些名字在说什么？

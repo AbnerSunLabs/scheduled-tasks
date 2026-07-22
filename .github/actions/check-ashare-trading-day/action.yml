@@ -1,0 +1,60 @@
+name: Check A-share trading day
+description: >-
+  判定上海时区今天是否为 A 股交易日；供 schedule（定时）闸门使用。
+  enabled=false 时直接放行（手动触发 / 周日复权巡检）。
+
+inputs:
+  enabled:
+    description: 是否真正查询日历（false 则 should_run=true）
+    required: false
+    default: "true"
+
+outputs:
+  should_run:
+    description: 是否继续跑同步任务
+    value: ${{ steps.probe.outputs.should_run }}
+  is_trading_day:
+    description: true / false / unknown / skipped
+    value: ${{ steps.probe.outputs.is_trading_day }}
+  cal_date:
+    description: 判定用的日历日 YYYY-MM-DD
+    value: ${{ steps.probe.outputs.cal_date }}
+  source:
+    description: 数据源标识
+    value: ${{ steps.probe.outputs.source }}
+  error:
+    description: 错误摘要（可空）
+    value: ${{ steps.probe.outputs.error }}
+
+runs:
+  using: composite
+  steps:
+    - name: Probe A-share trading day
+      id: probe
+      shell: bash
+      run: |
+        set -euo pipefail
+        if [ "${{ inputs.enabled }}" != "true" ]; then
+          echo "should_run=true" >> "$GITHUB_OUTPUT"
+          echo "is_trading_day=skipped" >> "$GITHUB_OUTPUT"
+          echo "cal_date=" >> "$GITHUB_OUTPUT"
+          echo "source=skipped" >> "$GITHUB_OUTPUT"
+          echo "error=" >> "$GITHUB_OUTPUT"
+          echo "trading-day gate skipped (enabled=false)"
+          exit 0
+        fi
+        set +e
+        python -m scheduled_tasks.market.ashare_trading_day --github-output
+        rc=$?
+        set -e
+        if [ "$rc" -ne 0 ]; then
+          # 进程级失败（import/未安装等）也 fail-open，避免闸门把 job 标红
+          {
+            echo "should_run=true"
+            echo "is_trading_day=unknown"
+            echo "cal_date="
+            echo "source=none"
+            echo "error=probe_process_exit_${rc}"
+          } >> "$GITHUB_OUTPUT"
+          echo "::warning::trading-day probe exited ${rc}; continue as trading day"
+        fi

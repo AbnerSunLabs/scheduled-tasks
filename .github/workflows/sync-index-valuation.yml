@@ -36,6 +36,12 @@ jobs:
     concurrency:
       group: sync-index-valuation
       cancel-in-progress: false
+    outputs:
+      should_run: ${{ steps.gate.outputs.should_run }}
+      is_trading_day: ${{ steps.gate.outputs.is_trading_day }}
+      cal_date: ${{ steps.gate.outputs.cal_date }}
+      calendar_error: ${{ steps.gate.outputs.error }}
+      calendar_source: ${{ steps.gate.outputs.source }}
 
     steps:
       - name: Checkout code
@@ -72,7 +78,14 @@ jobs:
             echo "index_code=000300.SH" >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Check A-share trading day
+        id: gate
+        uses: ./.github/actions/check-ashare-trading-day
+        with:
+          enabled: ${{ github.event_name == 'schedule' }}
+
       - name: Sync index valuation
+        if: steps.gate.outputs.should_run == 'true'
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           SYNC_MODE: ${{ steps.mode.outputs.mode }}
@@ -87,7 +100,7 @@ jobs:
             --index-code="$INDEX_CODE"
 
       - name: Upload summary artifact
-        if: always()
+        if: always() && steps.gate.outputs.should_run == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: sync-index-valuation-summary
@@ -100,6 +113,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Download summary artifact
+        if: needs.sync-index-valuation.outputs.should_run == 'true'
         uses: actions/download-artifact@v4
         continue-on-error: true
         with:
@@ -111,6 +125,10 @@ jobs:
           BARK_KEY: ${{ secrets.BARK_KEY }}
           JOB_RESULT: ${{ needs.sync-index-valuation.result }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          IS_TRADING_DAY: ${{ needs.sync-index-valuation.outputs.is_trading_day }}
+          CAL_DATE: ${{ needs.sync-index-valuation.outputs.cal_date }}
+          CALENDAR_ERROR: ${{ needs.sync-index-valuation.outputs.calendar_error }}
+          CALENDAR_SOURCE: ${{ needs.sync-index-valuation.outputs.calendar_source }}
         run: |
           set -euo pipefail
           if [ -z "${BARK_KEY:-}" ]; then
@@ -118,7 +136,37 @@ jobs:
             exit 0
           fi
 
+          if [ "${IS_TRADING_DAY:-}" = "false" ]; then
+            title="指数估值今日休市已跳过"
+            body="job=sync_hongsehuojian_fill_validate cal_date=${CAL_DATE:-?} source=${CALENDAR_SOURCE:-?}
+          ${RUN_URL}"
+            export BARK_TITLE="$title"
+            export BARK_BODY="$body"
+            python - <<'PY'
+          import json, os, urllib.request
+          payload = {
+              "device_key": os.environ["BARK_KEY"],
+              "title": os.environ["BARK_TITLE"],
+              "body": os.environ["BARK_BODY"],
+              "group": "scheduled-tasks",
+          }
+          req = urllib.request.Request(
+              "https://api.day.app/push",
+              data=json.dumps(payload).encode("utf-8"),
+              headers={"Content-Type": "application/json"},
+              method="POST",
+          )
+          with urllib.request.urlopen(req, timeout=30) as resp:
+              print(resp.read().decode("utf-8", errors="replace"))
+          PY
+            exit 0
+          fi
+
           summary_file="artifacts/sync_hongsehuojian_fill_validate_summary.json"
+          cal_warn=""
+          if [ "${IS_TRADING_DAY:-}" = "unknown" ]; then
+            cal_warn="【交易日历查询失败，已按交易日继续跑 error=${CALENDAR_ERROR:-?}】 "
+          fi
           if [ -f "$summary_file" ]; then
             eval "$(python - <<'PY'
           import json
@@ -137,7 +185,7 @@ jobs:
               partial) title="指数估值同步部分成功" ;;
               *) title="指数估值同步失败" ;;
             esac
-            body="job=sync_hongsehuojian_fill_validate index=${index_code} status=${status} trade_date=${valuation_trade_date} pe=${valuation_current_pe_ttm} metric_rows=${index_metric_rows}
+            body="${cal_warn}job=sync_hongsehuojian_fill_validate index=${index_code} status=${status} trade_date=${valuation_trade_date} pe=${valuation_current_pe_ttm} metric_rows=${index_metric_rows}
           ${RUN_URL}"
           else
             case "$JOB_RESULT" in
@@ -145,7 +193,7 @@ jobs:
               cancelled) title="指数估值同步取消" ;;
               *) title="指数估值同步失败" ;;
             esac
-            body="job=sync_hongsehuojian_fill_validate result=${JOB_RESULT} summary missing
+            body="${cal_warn}job=sync_hongsehuojian_fill_validate result=${JOB_RESULT} summary missing
           ${RUN_URL}"
           fi
 
