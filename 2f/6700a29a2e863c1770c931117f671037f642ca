@@ -1,0 +1,27 @@
+README.md
+  s_4cb2ce6f406269::t_783cefa59c9705 73
+doc/supabase-schema.md
+  s_4cb2ce6f406269::t_bb1a647d08c6b1 5-6,9-10,15,17-18,25-36,48-60,116,173,190,192,209,300-308,310,316,318,355,368,379,383-386,440-445,462,484-485,504
+doc/supabase-verification.md
+  s_4cb2ce6f406269::t_1d100635248c85 64-79,86,112,162-171
+src/scheduled_tasks/models/migrations/20260721_add_index_daily_metrics.sql
+  s_4cb2ce6f406269::t_992f7081812805 1-58
+src/scheduled_tasks/models/schema.sql
+  s_4cb2ce6f406269::t_3448d608e600ce 30-50,72
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "2f6700a29a2e863c1770c931117f671037f642ca",
+  "prompts": {},
+  "sessions": {
+    "s_4cb2ce6f406269": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "48caf92c-9ed4-4008-b391-e3a891a699f8",
+        "model": "unknown"
+      },
+      "human_author": "AbnerSun <sunyujiejohn@sina.com>"
+    }
+  }
+}
