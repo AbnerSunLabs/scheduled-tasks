@@ -6,16 +6,17 @@
 
 用**官网**校验库内主写：
 
-| 标的 | 官网 | 主库表 |
-|------|------|--------|
-| ETF `5xxxxx`（上交所） | 上交所 yunhq 日 K | `etf_daily` OHLC |
-| ETF `15xxxx`（深交所） | **暂无**官网 client（`--from-pool` 会跳过） | — |
-| 指数（可选） | 中证 `index-perf` | 仅 `index_valuation.current_pe_ttm`（日线表已删除） |
+| 标的                   | 官网                                        | 主库表                                              |
+| ---------------------- | ------------------------------------------- | --------------------------------------------------- |
+| ETF `5xxxxx`（上交所） | 上交所 yunhq 日 K                           | `etf_daily` OHLC                                    |
+| ETF `15xxxx`（深交所） | **暂无**官网 client（`--from-pool` 会跳过） | —                                                   |
+| 指数（可选）           | 中证 `index-perf`                           | 仅 `index_valuation.current_pe_ttm`（日线表已删除） |
 
 ## 行为
 
 - **默认**：只比对，**不 UPDATE / 不 INSERT**
-- **`--apply-official --yes`**：仅对 mismatch 行用官网字段 UPDATE；缺日仍不 INSERT
+- **`--apply-official --yes`**：仅对 mismatch 行用官网字段 UPDATE（`price_source='sse'` 等）；缺日仍不 INSERT
+- **锁定**：纠偏后的 `etf_daily` 行对 yfinance 主写 / `adj_check` 只读（`upsert_etf_daily_bars` / `update_etf_adj_columns` 跳过 `sse`/`szse`），重跑主写不会冲掉官网结果
 - **`--from-pool`**：校验 `etf_pool` 内全部沪市 ETF；自动 `--skip-index`（避免单指数绑死全池）
 - **`--mode=full`**：ETF 拉 `begin=-10000`（覆盖老标的全历史）；指数从 `2004-01-01` 拉到 `--end`
 - 官网返回空数组、或总 `validated=0` → `status=failed`（不再静默 success）

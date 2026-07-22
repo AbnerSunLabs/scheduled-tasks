@@ -16,6 +16,12 @@ from psycopg.types.json import Jsonb
 # Prisma / 部分前端模板会带上；libpq/psycopg 不认
 _UNSUPPORTED_URI_QUERY_KEYS = frozenset({"pgbouncer"})
 
+# 官网纠偏写入的 price_source；主写 UPSERT / adj_check 不得覆盖这些行
+ETF_DAILY_LOCKED_PRICE_SOURCES = frozenset({"sse", "szse"})
+_ETF_DAILY_LOCKED_PRICE_SOURCES_SQL = ", ".join(
+    f"'{s}'" for s in sorted(ETF_DAILY_LOCKED_PRICE_SOURCES)
+)
+
 
 def _split_authority(url: str) -> tuple[str, str, str, str, str]:
     """拆 DATABASE_URL → (scheme, user, password, hostport, path_and_query)。
@@ -352,13 +358,17 @@ def upsert_etf_daily_bars(
     conn: Connection[dict[str, Any]],
     rows: Iterable[dict[str, Any]],
 ) -> int:
-    """写入不复权 OHLCV + 复权列 + price_source；复权列非空才覆盖。"""
+    """写入不复权 OHLCV + 复权列 + price_source；复权列非空才覆盖。
+
+    已有行 ``price_source`` 属于官网锁定集（``sse``/``szse``）时跳过 UPDATE，
+    避免主写冲掉 ``--apply-official`` 纠偏结果。
+    """
     values = list(rows)
     if not values:
         return 0
     with conn.cursor() as cur:
         cur.executemany(
-            """
+            f"""
             insert into public.etf_daily (
               etf_code, trade_date,
               open, high, low, close, volume,
@@ -388,6 +398,8 @@ def upsert_etf_daily_bars(
                 close_hfq = coalesce(excluded.close_hfq, etf_daily.close_hfq),
                 price_source = excluded.price_source,
                 updated_at = now()
+            where coalesce(etf_daily.price_source, '')
+                  not in ({_ETF_DAILY_LOCKED_PRICE_SOURCES_SQL})
             """,
             values,
         )
@@ -398,13 +410,16 @@ def update_etf_adj_columns(
     conn: Connection[dict[str, Any]],
     rows: Iterable[dict[str, Any]],
 ) -> int:
-    """仅 UPDATE 已有行的复权列；不改 price_source / 不复权 OHLCV。"""
+    """仅 UPDATE 已有行的复权列；不改 price_source / 不复权 OHLCV。
+
+    官网锁定行（``sse``/``szse``）整行跳过，与主写 UPSERT 一致。
+    """
     values = list(rows)
     if not values:
         return 0
     with conn.cursor() as cur:
         cur.executemany(
-            """
+            f"""
             update public.etf_daily
             set open_qfq = coalesce(%(open_qfq)s, open_qfq),
                 high_qfq = coalesce(%(high_qfq)s, high_qfq),
@@ -417,6 +432,8 @@ def update_etf_adj_columns(
                 updated_at = now()
             where etf_code = %(etf_code)s
               and trade_date = %(trade_date)s
+              and coalesce(price_source, '')
+                  not in ({_ETF_DAILY_LOCKED_PRICE_SOURCES_SQL})
             """,
             values,
         )

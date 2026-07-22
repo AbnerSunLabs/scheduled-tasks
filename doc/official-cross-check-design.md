@@ -8,12 +8,12 @@
 
 主数据源已稳定：
 
-| 数据 | 主写 |
-|------|------|
-| ETF 日 K（`etf_daily`） | yfinance；红色火箭仅缺日 INSERT + 已有行比对 |
-| 指数估值（`index_valuation`） | 红色火箭 |
-| 指数估值（`index_valuation`） | 红色火箭 |
-| 行业权重（`index_industry_weights`） | 红色火箭 |
+| 数据                                 | 主写                                         |
+| ------------------------------------ | -------------------------------------------- |
+| ETF 日 K（`etf_daily`）              | yfinance；红色火箭仅缺日 INSERT + 已有行比对 |
+| 指数估值（`index_valuation`）        | 红色火箭                                     |
+| 指数估值（`index_valuation`）        | 红色火箭                                     |
+| 行业权重（`index_industry_weights`） | 红色火箭                                     |
 
 需要增加 **官网优先的双源校验**：默认不改正库，发现差异告警；人工确认后可用官网覆盖。
 
@@ -34,21 +34,21 @@
 
 ## 决策摘要
 
-| 项 | 选择 |
-|----|------|
-| 架构 | **独立校验 job**（与主写解耦） |
-| 官网组合 | ETF → 交易所；指数 → 中证等指数公司；ETF 必要时基金公司兜底 |
-| 冲突处理 | 默认只告警；`--apply-official` 才覆盖 |
-| 缺日 | 官网有、库无 → 记 `missing_in_db`，**默认不 INSERT**（补缺仍归主写） |
-| 首期标的 | `512170`（医疗ETF华宝）+ `399989.SZ`（中证医疗） |
+| 项       | 选择                                                                  |
+| -------- | --------------------------------------------------------------------- |
+| 架构     | **独立校验 job**（与主写解耦）                                        |
+| 官网组合 | ETF → 交易所；指数 → 中证等指数公司；ETF 必要时基金公司兜底           |
+| 冲突处理 | 默认只告警；`--apply-official` 才覆盖；纠偏后主写跳过 `sse`/`szse` 行 |
+| 缺日     | 官网有、库无 → 记 `missing_in_db`，**默认不 INSERT**（补缺仍归主写）  |
+| 首期标的 | `512170`（医疗 ETF 华宝）+ `399989.SZ`（中证医疗）                    |
 
 ## 角色与数据源
 
-| 角色 | ETF | 指数 |
-|------|-----|------|
-| 主写 | yfinance（全池）；红火箭补缺 | 红火箭 |
-| 校验源（优先） | 上交所（`512170` 在沪） | 中证指数（CSI） |
-| 校验源（兜底） | 基金公司产品页（可选二期） | 深交所披露页（可选二期） |
+| 角色           | ETF                          | 指数                     |
+| -------------- | ---------------------------- | ------------------------ |
+| 主写           | yfinance（全池）；红火箭补缺 | 红火箭                   |
+| 校验源（优先） | 上交所（`512170` 在沪）      | 中证指数（CSI）          |
+| 校验源（兜底） | 基金公司产品页（可选二期）   | 深交所披露页（可选二期） |
 
 红色火箭继续主写/补缺；**不**定义为官网权威。
 
@@ -56,21 +56,21 @@
 
 ### ETF（`etf_daily`，按 `trade_date`）
 
-| 字段 | 首期 |
-|------|------|
-| `close`（不复权） | 必校 |
-| `open` / `high` / `low` | 官网有则校 |
-| `*_qfq` / `*_hfq` | 暂缓 |
-| volume | 可选；官网单位需 Spike 确认 |
+| 字段                    | 首期                        |
+| ----------------------- | --------------------------- |
+| `close`（不复权）       | 必校                        |
+| `open` / `high` / `low` | 官网有则校                  |
+| `*_qfq` / `*_hfq`       | 暂缓                        |
+| volume                  | 可选；官网单位需 Spike 确认 |
 
 ### 指数
 
-| 对象 | 字段 | 首期 |
-|------|------|------|
-| `index_valuation` | `current_pe_ttm` | 可选校（日线表已删除，不再校 close） |
-| `index_valuation` | `current_pe_ttm` | 中证有则校 |
-| `index_valuation` | `pe_ttm_avg_5y` / `10y` | 暂缓（官网未必有同口径序列） |
-| `index_industry_weights` | — | 二期 |
+| 对象                     | 字段                    | 首期                                 |
+| ------------------------ | ----------------------- | ------------------------------------ |
+| `index_valuation`        | `current_pe_ttm`        | 可选校（日线表已删除，不再校 close） |
+| `index_valuation`        | `current_pe_ttm`        | 中证有则校                           |
+| `index_valuation`        | `pe_ttm_avg_5y` / `10y` | 暂缓（官网未必有同口径序列）         |
+| `index_industry_weights` | —                       | 二期                                 |
 
 ## 行为语义
 
@@ -92,13 +92,13 @@
 
 ## 工程落点（名实相符）
 
-| 类型 | 建议路径 / 名称 |
-|------|-----------------|
-| Job | `scheduled_tasks.jobs.sync_official_cross_check` |
-| `JOB_NAME` | `sync_official_cross_check` |
-| Client | `etf/sse_client.py`（上交所）、`etf/csindex_client.py`（中证） |
-| Artifact | `artifacts/sync_official_cross_check_summary.json` |
-| 文档 | `doc/official-cross-check.md`（实现后）；本设计文档同步保留 |
+| 类型       | 建议路径 / 名称                                                |
+| ---------- | -------------------------------------------------------------- |
+| Job        | `scheduled_tasks.jobs.sync_official_cross_check`               |
+| `JOB_NAME` | `sync_official_cross_check`                                    |
+| Client     | `etf/sse_client.py`（上交所）、`etf/csindex_client.py`（中证） |
+| Artifact   | `artifacts/sync_official_cross_check_summary.json`             |
+| 文档       | `doc/official-cross-check.md`（实现后）；本设计文档同步保留    |
 
 CLI 草案：
 
@@ -115,24 +115,24 @@ Allowlist 默认与红火箭一致，可用 CLI 覆盖。
 
 ## 实施分期
 
-1. **Spike（只读、不写库）**  
-   - 摸清上交所 `512170`、中证 `399989` 的可机读接口/字段/单位/历史深度/限流。  
+1. **Spike（只读、不写库）**
+   - 摸清上交所 `512170`、中证 `399989` 的可机读接口/字段/单位/历史深度/限流。
    - 产出短笔记（可放 `doc/spike-official-sse-csindex.md`）。
-2. **MVP**  
+2. **MVP**
    - 独立 job：allowlist 日频 `close`（+ 可选 OHLC）与指数 `close`、当日 PE 比对；summary + `sync_runs`；告警。
-3. **`--apply-official`**  
+3. **`--apply-official`**
    - 仅 mismatch UPDATE；单测覆盖「无 flag 绝不写库」。
-4. **扩容**  
+4. **扩容**
    - 全 `etf_pool` / 跟踪指数；行业权重；复权字段（若 Spike 证明口径可对齐）。
 
 ## 风险与缓解
 
-| 风险 | 缓解 |
-|------|------|
+| 风险                            | 缓解                                                                         |
+| ------------------------------- | ---------------------------------------------------------------------------- |
 | 交易所/中证页面改版、无稳定 API | Spike 先证伪；client 隔离；失败记 `source_unavailable` 不误报为行情 mismatch |
-| 不复权 vs 前复权混比 | 文档与代码明确只比不复权 close；Spike 抽样核对 |
-| `--apply-official` 误用 | 默认关闭；日志与 meta 标明 `applied_official=true`；可要求 `--yes` |
-| 与红火箭校验重复 | 红火箭仍是主写侧自检；本 job 专责「官网 vs 库」 |
+| 不复权 vs 前复权混比            | 文档与代码明确只比不复权 close；Spike 抽样核对                               |
+| `--apply-official` 误用         | 默认关闭；日志与 meta 标明 `applied_official=true`；可要求 `--yes`           |
+| 与红火箭校验重复                | 红火箭仍是主写侧自检；本 job 专责「官网 vs 库」                              |
 
 ## 验收标准（MVP）
 

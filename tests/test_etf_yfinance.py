@@ -302,3 +302,67 @@ def test_adj_check_cli_start_still_uses_db_scale(
     assert updated[0][0]["close_hfq"] == pytest.approx(10.0)
     # 若误用窗口首日 scale=1，hfq 会变成 9.0
     assert updated[0][0]["close_hfq"] != pytest.approx(9.0)
+
+
+def test_upsert_etf_daily_bars_skips_official_locked_sources() -> None:
+    from scheduled_tasks.db import upsert_etf_daily_bars
+
+    conn = MagicMock()
+    cur = MagicMock()
+    conn.cursor.return_value.__enter__.return_value = cur
+    n = upsert_etf_daily_bars(
+        conn,
+        [
+            {
+                "etf_code": "512170",
+                "trade_date": date(2026, 7, 20),
+                "open": 1.0,
+                "high": 1.1,
+                "low": 0.9,
+                "close": 1.05,
+                "volume": 100.0,
+                "open_qfq": None,
+                "high_qfq": None,
+                "low_qfq": None,
+                "close_qfq": None,
+                "open_hfq": None,
+                "high_hfq": None,
+                "low_hfq": None,
+                "close_hfq": None,
+                "price_source": "yfinance",
+            }
+        ],
+    )
+    assert n == 1
+    sql = cur.executemany.call_args.args[0]
+    assert "on conflict (etf_code, trade_date) do update" in sql
+    assert "not in ('sse', 'szse')" in sql
+
+
+def test_update_etf_adj_columns_skips_official_locked_sources() -> None:
+    from scheduled_tasks.db import update_etf_adj_columns
+
+    conn = MagicMock()
+    cur = MagicMock()
+    conn.cursor.return_value.__enter__.return_value = cur
+    n = update_etf_adj_columns(
+        conn,
+        [
+            {
+                "etf_code": "512170",
+                "trade_date": date(2026, 7, 20),
+                "open_qfq": 1.0,
+                "high_qfq": 1.0,
+                "low_qfq": 1.0,
+                "close_qfq": 1.0,
+                "open_hfq": 1.0,
+                "high_hfq": 1.0,
+                "low_hfq": 1.0,
+                "close_hfq": 1.0,
+            }
+        ],
+    )
+    assert n == 1
+    sql = cur.executemany.call_args.args[0]
+    assert "not in ('sse', 'szse')" in sql
+    assert "price_source" in sql
