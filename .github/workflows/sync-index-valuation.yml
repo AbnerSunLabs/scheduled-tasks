@@ -136,29 +136,9 @@ jobs:
             exit 0
           fi
 
+          # 休市静默：法定假不推「已跳过」；仅 unknown 保留告警
           if [ "${IS_TRADING_DAY:-}" = "false" ]; then
-            title="指数估值今日休市已跳过"
-            body="job=sync_hongsehuojian_fill_validate cal_date=${CAL_DATE:-?} source=${CALENDAR_SOURCE:-?}
-          ${RUN_URL}"
-            export BARK_TITLE="$title"
-            export BARK_BODY="$body"
-            python - <<'PY'
-          import json, os, urllib.request
-          payload = {
-              "device_key": os.environ["BARK_KEY"],
-              "title": os.environ["BARK_TITLE"],
-              "body": os.environ["BARK_BODY"],
-              "group": "scheduled-tasks",
-          }
-          req = urllib.request.Request(
-              "https://api.day.app/push",
-              data=json.dumps(payload).encode("utf-8"),
-              headers={"Content-Type": "application/json"},
-              method="POST",
-          )
-          with urllib.request.urlopen(req, timeout=30) as resp:
-              print(resp.read().decode("utf-8", errors="replace"))
-          PY
+            echo "休市跳过，Bark 静默 cal_date=${CAL_DATE:-?} source=${CALENDAR_SOURCE:-?}"
             exit 0
           fi
 
