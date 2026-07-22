@@ -1,0 +1,23 @@
+src/scheduled_tasks/models/migrations/20260722_family_finance_ledger.sql
+  s_ba8b7a4a78ac64::t_f2062745f00494 1-257
+src/scheduled_tasks/models/migrations/20260722_family_finance_rls_allowlist.sql
+  s_ba8b7a4a78ac64::t_74140a594cf7f9 1-45
+src/scheduled_tasks/models/migrations/20260722_family_members_unique_self.sql
+  s_ba8b7a4a78ac64::t_117bd0d9be8410 1-9
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "7fe0f3ced24c679d118288a5bbe14ef3d927d102",
+  "prompts": {},
+  "sessions": {
+    "s_ba8b7a4a78ac64": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "e0029261-08b3-429d-9436-1cd1b1eb3a5d",
+        "model": "unknown"
+      },
+      "human_author": "AbnerSun <sunyujiejohn@sina.com>"
+    }
+  }
+}
