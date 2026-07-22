@@ -27,6 +27,27 @@ create table if not exists index_industry_weights (
 create index if not exists idx_index_industry_weights_as_of_date
   on index_industry_weights (as_of_date desc);
 
+-- 指数日指标（收盘点位 / PE TTM / PB）；与已删的 index_daily_prices 不同，同一主键可合入点位与估值。
+-- 主写：sync_hongsehuojian_fill_validate（字段级 coalesce upsert）。
+create table if not exists index_daily_metrics (
+  index_code text not null references indices(code) on delete cascade,
+  trade_date date not null,
+  close numeric,
+  pe_ttm numeric,
+  pb numeric,
+  price_source text,
+  valuation_source text,
+  updated_at timestamptz not null default now(),
+  primary key (index_code, trade_date),
+  constraint index_daily_metrics_close_positive check (close is null or close > 0),
+  constraint index_daily_metrics_pe_positive check (pe_ttm is null or pe_ttm > 0),
+  constraint index_daily_metrics_pb_positive check (pb is null or pb > 0),
+  constraint index_daily_metrics_has_value check (num_nonnulls(close, pe_ttm, pb) > 0)
+);
+
+create index if not exists idx_index_daily_metrics_trade_date
+  on index_daily_metrics (trade_date desc);
+
 -- index_codes 为历史命名遗留：语义为「本 run 涉及的标的代码」，不限于指数。
 create table if not exists sync_runs (
   id bigserial primary key,
@@ -48,7 +69,7 @@ create index if not exists idx_sync_runs_started_at
   on sync_runs (started_at desc);
 
 -- ETF 表：索引命名沿用线上 Supabase 默认风格（后缀 _idx），与指数表 idx_ 前缀不同。
--- 指数相关：无日线表；红色火箭可写估值 / 行业权重（见 sync_hongsehuojian_fill_validate）。
+-- 指数相关：日指标见 index_daily_metrics；红色火箭可写估值 / 日指标 / 行业权重。
 -- 本仓库主写 etf_daily，只读 etf_pool（当前池主数据）。
 create table if not exists etf_pool (
   etf_code text primary key,

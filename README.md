@@ -70,6 +70,7 @@ psql "$DATABASE_URL" -f src/scheduled_tasks/models/migrations/20260709_etf_renam
 psql "$DATABASE_URL" -f src/scheduled_tasks/models/migrations/20260710_cockpit_ledger_and_fx_rates.sql
 psql "$DATABASE_URL" -f src/scheduled_tasks/models/migrations/20260718_etf_pool_authenticated_read.sql
 psql "$DATABASE_URL" -f src/scheduled_tasks/models/migrations/20260718_index_market_anon_read.sql
+psql "$DATABASE_URL" -f src/scheduled_tasks/models/migrations/20260721_add_index_daily_metrics.sql
 ```
 
 4. **下线汇率表**（须单独授权）：
