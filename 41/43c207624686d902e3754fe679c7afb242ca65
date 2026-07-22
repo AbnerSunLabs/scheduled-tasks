@@ -1,0 +1,23 @@
+doc/supabase-schema.md
+  s_20e37acf2901ca::t_d36aa2b12c6591 311-312,397,399
+doc/supabase-verification.md
+  s_20e37acf2901ca::t_8dcaafa5127b21 54,71,79
+src/scheduled_tasks/models/migrations/20260722_drop_etf_daily_idle_columns.sql
+  s_20e37acf2901ca::t_8a2831e720e756 1-10
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "4143c207624686d902e3754fe679c7afb242ca65",
+  "prompts": {},
+  "sessions": {
+    "s_20e37acf2901ca": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "ad43133d-f291-469f-aaf9-3b5f6f630545",
+        "model": "unknown"
+      },
+      "human_author": "AbnerSun <sunyujiejohn@sina.com>"
+    }
+  }
+}
