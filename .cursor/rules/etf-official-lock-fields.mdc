@@ -1,0 +1,27 @@
+# 官网纠偏锁字段、不锁整行
+
+`price_source` 为 `sse` / `szse`（上交所 / 深交所官网纠偏）时，**只锁定官网改过的不复权 OHLC**（及来源标记），禁止为「保护官网」而整行只读。
+
+## 正确语义
+
+| 写路径                                           | 对 `sse`/`szse` 行                                            |
+| ------------------------------------------------ | ------------------------------------------------------------- |
+| `upsert_etf_daily_bars`（yfinance 主写）         | 跳过 UPDATE，不冲掉不复权 OHLC / `price_source`               |
+| `update_etf_adj_columns`（`adj_check` 复权巡检） | **允许**只刷 `*_qfq` / `*_hfq`；不改不复权价与 `price_source` |
+| `update_etf_daily_ohlc_official`                 | 可写不复权 OHLC，并标记 `price_source`                        |
+
+常量 `ETF_DAILY_LOCKED_PRICE_SOURCES` **仅用于主写 UPSERT**，不得再套到 `update_etf_adj_columns`。
+
+## 反例 / 正例
+
+```text
+❌ update_etf_adj_columns WHERE price_source NOT IN ('sse','szse')  → 纠偏后复权永久冻住
+❌ 文档写「纠偏行对主写 / adj_check 整行只读」
+✅ 主写跳过锁定行；adj_check 仍刷复权列
+✅ 文档写「字段级锁定：护 OHLC，不锁复权」
+```
+
+## 自检
+
+- [ ] 改锁逻辑时是否区分「护 OHLC」与「刷复权」？
+- [ ] README / `doc/official-cross-check*.md` / `doc/supabase-schema.md` / 小白文档是否仍写整行只读？

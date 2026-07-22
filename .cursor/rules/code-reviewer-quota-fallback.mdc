@@ -1,0 +1,32 @@
+---
+description: code-reviewer 子代理额度不足时必须用 Grok 4.5 High 重跑 CR
+alwaysApply: true
+---
+
+# Code Reviewer 额度不足 → Grok 4.5 High
+
+改动完成后须跑 `code-reviewer` 子代理做 CR。若该子代理因 **API 额度不足、rate limit、usage limit**（或同类错误，如 `API usage limit reached`）无法启动或失败：
+
+1. **立刻重试**：同一轮 CR 改用 **Grok 4.5 High**
+2. Task 参数：`subagent_type=code-reviewer`，`model=cursor-grok-4.5-high`
+3. Prompt / 审查范围与原 CR 请求保持一致（diff、需求、关注点）
+
+## 禁止
+
+```text
+❌ 额度失败后跳过 CR，只写「已自检」
+❌ 额度失败后换无关模型或不带 code-reviewer 类型应付
+❌ 不告知用户已切换到 Grok 4.5 High 兜底
+```
+
+## 正例
+
+```text
+✅ 默认 code-reviewer → 额度错误 → 立刻 Task(model=cursor-grok-4.5-high, subagent_type=code-reviewer)
+✅ 回复中一句说明：原 CR 额度不足，已用 Grok 4.5 High 重跑
+```
+
+## 自检
+
+- [ ] Verify 步骤是否因额度跳过了 CR？
+- [ ] 重跑是否显式指定了 `cursor-grok-4.5-high`？

@@ -16,7 +16,7 @@
 
 - **默认**：只比对，**不 UPDATE / 不 INSERT**
 - **`--apply-official --yes`**：仅对 mismatch 行用官网字段 UPDATE（`price_source='sse'` 等）；缺日仍不 INSERT
-- **锁定**：纠偏后的 `etf_daily` 行对 yfinance 主写 / `adj_check` 只读（`upsert_etf_daily_bars` / `update_etf_adj_columns` 跳过 `sse`/`szse`），重跑主写不会冲掉官网结果
+- **锁定（字段级）**：纠偏后 `price_source='sse'`/`szse` 时，yfinance 主写（`upsert_etf_daily_bars`）跳过整行，不冲掉官网不复权 OHLC；`adj_check`（`update_etf_adj_columns`）仍可只刷 `*_qfq`/`*_hfq`（前/后复权），不改不复权价与 `price_source`
 - **`--from-pool`**：校验 `etf_pool` 内全部沪市 ETF；自动 `--skip-index`（避免单指数绑死全池）
 - **`--mode=full`**：ETF 拉 `begin=-10000`（覆盖老标的全历史）；指数从 `2004-01-01` 拉到 `--end`
 - 官网返回空数组、或总 `validated=0` → `status=failed`（不再静默 success）

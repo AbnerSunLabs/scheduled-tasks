@@ -16,7 +16,7 @@ from psycopg.types.json import Jsonb
 # Prisma / 部分前端模板会带上；libpq/psycopg 不认
 _UNSUPPORTED_URI_QUERY_KEYS = frozenset({"pgbouncer"})
 
-# 官网纠偏写入的 price_source；主写 UPSERT / adj_check 不得覆盖这些行
+# 官网纠偏写入的 price_source；仅主写 UPSERT 跳过这些行（护不复权 OHLC）；adj_check 仍可刷复权列
 ETF_DAILY_LOCKED_PRICE_SOURCES = frozenset({"sse", "szse"})
 _ETF_DAILY_LOCKED_PRICE_SOURCES_SQL = ", ".join(
     f"'{s}'" for s in sorted(ETF_DAILY_LOCKED_PRICE_SOURCES)
@@ -361,7 +361,8 @@ def upsert_etf_daily_bars(
     """写入不复权 OHLCV + 复权列 + price_source；复权列非空才覆盖。
 
     已有行 ``price_source`` 属于官网锁定集（``sse``/``szse``）时跳过 UPDATE，
-    避免主写冲掉 ``--apply-official`` 纠偏结果。
+    避免主写冲掉 ``--apply-official`` 纠偏的不复权 OHLC。
+    复权列刷新走 ``update_etf_adj_columns``（不跳过锁定行）。
     """
     values = list(rows)
     if not values:
@@ -412,14 +413,15 @@ def update_etf_adj_columns(
 ) -> int:
     """仅 UPDATE 已有行的复权列；不改 price_source / 不复权 OHLCV。
 
-    官网锁定行（``sse``/``szse``）整行跳过，与主写 UPSERT 一致。
+    官网纠偏行（``sse``/``szse``）也允许刷复权：锁定的是不复权 OHLC，
+    不是整行。主写 UPSERT 仍跳过这些行，避免冲掉官网 OHLC。
     """
     values = list(rows)
     if not values:
         return 0
     with conn.cursor() as cur:
         cur.executemany(
-            f"""
+            """
             update public.etf_daily
             set open_qfq = coalesce(%(open_qfq)s, open_qfq),
                 high_qfq = coalesce(%(high_qfq)s, high_qfq),
@@ -432,8 +434,6 @@ def update_etf_adj_columns(
                 updated_at = now()
             where etf_code = %(etf_code)s
               and trade_date = %(trade_date)s
-              and coalesce(price_source, '')
-                  not in ({_ETF_DAILY_LOCKED_PRICE_SOURCES_SQL})
             """,
             values,
         )

@@ -339,7 +339,8 @@ def test_upsert_etf_daily_bars_skips_official_locked_sources() -> None:
     assert "not in ('sse', 'szse')" in sql
 
 
-def test_update_etf_adj_columns_skips_official_locked_sources() -> None:
+def test_update_etf_adj_columns_allows_official_locked_sources() -> None:
+    """官网锁定只护 OHLC；adj_check 仍可刷 *_qfq/*_hfq。"""
     from scheduled_tasks.db import update_etf_adj_columns
 
     conn = MagicMock()
@@ -364,5 +365,7 @@ def test_update_etf_adj_columns_skips_official_locked_sources() -> None:
     )
     assert n == 1
     sql = cur.executemany.call_args.args[0]
-    assert "not in ('sse', 'szse')" in sql
-    assert "price_source" in sql
+    assert "not in ('sse', 'szse')" not in sql
+    assert "price_source" not in sql
+    assert "open_qfq" in sql
+    assert "close_hfq" in sql
