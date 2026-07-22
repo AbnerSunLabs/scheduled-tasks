@@ -1,0 +1,31 @@
+.cursor/rules/code-reviewer-quota-fallback.mdc
+  s_20e37acf2901ca::t_19e29aa6b6ef4d 1-32
+.cursor/rules/etf-official-lock-fields.mdc
+  s_20e37acf2901ca::t_4f61ebf977a4dd 1-27
+README.md
+  s_20e37acf2901ca::t_05c3d10ff70cab 36
+doc/official-cross-check-design.md
+  s_20e37acf2901ca::t_19ab3a9e958111 37-43
+doc/official-cross-check.md
+  s_20e37acf2901ca::t_f2acfb4b886360 19
+src/scheduled_tasks/db.py
+  s_20e37acf2901ca::t_7fa282d1c291f6 19,364-365,416-417,424
+tests/test_etf_yfinance.py
+  s_20e37acf2901ca::t_230707c03a09e3 342-343,368-371
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "6d9464ff7fffa980b2afc3ee8da29bd9412a0215",
+  "prompts": {},
+  "sessions": {
+    "s_20e37acf2901ca": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "ad43133d-f291-469f-aaf9-3b5f6f630545",
+        "model": "unknown"
+      },
+      "human_author": "AbnerSun <sunyujiejohn@sina.com>"
+    }
+  }
+}
