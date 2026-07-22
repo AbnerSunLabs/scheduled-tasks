@@ -1,0 +1,39 @@
+.cursor/rules/chinese-with-identifiers.mdc
+  s_eecde398608817::t_860ce917eed888 1-33
+.github/actions/check-ashare-trading-day/action.yml
+  s_eecde398608817::t_536be5cde77e66 1-60
+.github/workflows/sync-etf-kline.yml
+  s_eecde398608817::t_e6e740641b3c75 41-46,85-91,93,112,125,137-140,148-173,175-178,203,211
+.github/workflows/sync-index-valuation.yml
+  s_eecde398608817::t_7067f84af3927d 39-44,81-86,88,103,116,128-131,139-164,166-169,188,196
+.github/workflows/sync-official-cross-check.yml
+  s_eecde398608817::t_f2564b1d59a562 43-48,87-92,94,114,127,139-142,150-175,177-180,206,214
+README.md
+  s_eecde398608817::t_0705e2cd3d0cad 5,17,22
+doc/ashare-trading-day-gate.md
+  s_eecde398608817::t_b8892164b117ba 1-53
+doc/official-cross-check.md
+  s_eecde398608817::t_a125c620f3312d 50-51
+src/scheduled_tasks/market/__init__.py
+  s_eecde398608817::t_f14a5cf48c49a9 1
+src/scheduled_tasks/market/ashare_trading_day.py
+  s_eecde398608817::t_38888fa56b2b09 1-228
+tests/test_ashare_trading_day.py
+  s_eecde398608817::t_6e4f9afd5065b2 1-153
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "b1edfc0d76a44f038a30db0e839c84318cb1969a",
+  "prompts": {},
+  "sessions": {
+    "s_eecde398608817": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "59b434d4-d6a0-4afb-8f46-21618ceb98db",
+        "model": "unknown"
+      },
+      "human_author": "AbnerSun <sunyujiejohn@sina.com>"
+    }
+  }
+}
