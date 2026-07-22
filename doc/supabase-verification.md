@@ -51,6 +51,7 @@ psql "$DATABASE_URL" -f src/scheduled_tasks/models/migrations/20260719_rename_et
 
 ```bash
 psql "$DATABASE_URL" -f src/scheduled_tasks/models/migrations/20260717_drop_etf_daily_amount_columns.sql
+psql "$DATABASE_URL" -f src/scheduled_tasks/models/migrations/20260722_drop_etf_daily_idle_columns.sql
 psql "$DATABASE_URL" -f src/scheduled_tasks/models/migrations/20260717_drop_trade_calendar.sql
 ```
 
@@ -67,7 +68,7 @@ psql "$DATABASE_URL" -f src/scheduled_tasks/models/migrations/20260716_add_chine
 - `index_daily_metrics`（红色火箭主写；`20260721_add_index_daily_metrics.sql`）
 - `sync_runs`（含 `meta jsonb`）
 - `etf_pool`
-- `etf_daily`（复权 8 列 + `price_source`；无成交额列）
+- `etf_daily`（复权 8 列 + `price_source`；无成交额列 / 无闲置净值侧列）
 - `index_valuation`（红色火箭可写）
 - 账本 12 表（DDL only；见 `20260710_cockpit_ledger_and_fx_rates.sql`）
 - 确认 **不存在** `fx_rates`（`20260721_drop_fx_rates.sql`）
@@ -75,6 +76,7 @@ psql "$DATABASE_URL" -f src/scheduled_tasks/models/migrations/20260716_add_chine
 - 确认 **不存在** `index_daily_valuations`（已由 `20260717_drop_index_daily_valuations.sql` 删除）
 - 确认 **不存在** `trade_calendar`（`20260717_drop_trade_calendar.sql`）
 - 确认 `etf_daily` **无** `amount` / `amount_source` / `amount_updated_at`（`20260717_drop_etf_daily_amount_columns.sql`）
+- 确认 `etf_daily` **无** `nav` / `premium_rate` / `fund_size` / `listing_days` / `bid_price` / `ask_price`（`20260722_drop_etf_daily_idle_columns.sql`）
 - 确认 **不存在** `etf_valuation_snapshots` / `etf_valuation` / `portfolio_snapshots`（前两者已依次迁移为 `index_valuation`）
 
 11. Confirm these views exist（估值列改挂 `index_valuation`）:

@@ -303,11 +303,12 @@ erDiagram
 | `trade_date`                                                                      | `date`              | **PK**                    | 交易日                                                                                                                                                                                                         |
 | `open/high/low/close`                                                             | `numeric`           | close NOT NULL            | **不复权** OHLC                                                                                                                                                                                                |
 | `volume`                                                                          | `numeric`           | 可空                      | 成交量（**手**）                                                                                                                                                                                               |
-| `nav` / `premium_rate` / `fund_size` / `listing_days` / `bid_price` / `ask_price` | `numeric`/`integer` | 可空                      | **非本 job 字段**，upsert 不覆盖                                                                                                                                                                               |
 | `open_qfq` / `high_qfq` / `low_qfq` / `close_qfq`                                 | `numeric(18,4)`     | 可空                      | 前复权 OHLC                                                                                                                                                                                                    |
 | `open_hfq` / `high_hfq` / `low_hfq` / `close_hfq`                                 | `numeric(18,4)`     | 可空                      | 后复权 OHLC                                                                                                                                                                                                    |
 | `price_source`                                                                    | `text`              | 可空                      | 不复权 OHLC/volume 来源：`yfinance`（主写）/ `hongsehuojian`（红色火箭补缺 INSERT）/ `sse`（上交所官网纠偏）/ `adj_gap_fill`（历史缺复权回填）；`sse`/`szse` 时主写 UPSERT 不覆盖该行 OHLC；`adj_check` 仍可刷复权列、不改本列 |
 | `updated_at`                                                                      | `timestamptz`       | NOT NULL, DEFAULT `now()` | **价格侧**新鲜度                                                                                                                                                                                               |
+
+> 已删除闲置列（job 从不写）：`nav` / `premium_rate` / `fund_size` / `listing_days` / `bid_price` / `ask_price`（`20260722_drop_etf_daily_idle_columns.sql`）。成交额列删除见 `20260717_drop_etf_daily_amount_columns.sql`。
 
 **索引：** `etf_daily_trade_date_idx`：`(trade_date DESC)`
 
@@ -393,8 +394,9 @@ psql "$DATABASE_URL" -f src/scheduled_tasks/models/migrations/20260709_etf_renam
 # etf_pool_snapshots → etf_pool
 psql "$DATABASE_URL" -f src/scheduled_tasks/models/migrations/20260715_rename_etf_pool_snapshots_to_etf_pool.sql
 
-# 清理废弃对象（旧库）：成交额列 + trade_calendar
+# 清理废弃对象（旧库）：成交额列 + 闲置净值侧列 + trade_calendar
 psql "$DATABASE_URL" -f src/scheduled_tasks/models/migrations/20260717_drop_etf_daily_amount_columns.sql
+psql "$DATABASE_URL" -f src/scheduled_tasks/models/migrations/20260722_drop_etf_daily_idle_columns.sql
 psql "$DATABASE_URL" -f src/scheduled_tasks/models/migrations/20260717_drop_trade_calendar.sql
 
 # etf_pool.tracking_index_code 回填

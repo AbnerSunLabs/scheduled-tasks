@@ -98,13 +98,7 @@ create table if not exists etf_daily (
   low numeric,
   close numeric not null,
   volume numeric,
-  nav numeric,
-  premium_rate numeric,
-  fund_size numeric,
-  listing_days integer,
   updated_at timestamptz not null default now(),
-  bid_price numeric,
-  ask_price numeric,
   -- 不复权 open/high/low/close；*_qfq 前复权；*_hfq 后复权
   open_qfq numeric(18, 4),
   high_qfq numeric(18, 4),
