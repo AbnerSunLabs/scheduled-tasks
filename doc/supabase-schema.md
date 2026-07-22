@@ -306,7 +306,7 @@ erDiagram
 | `nav` / `premium_rate` / `fund_size` / `listing_days` / `bid_price` / `ask_price` | `numeric`/`integer` | 可空                      | **非本 job 字段**，upsert 不覆盖                                                                                                                                                                               |
 | `open_qfq` / `high_qfq` / `low_qfq` / `close_qfq`                                 | `numeric(18,4)`     | 可空                      | 前复权 OHLC                                                                                                                                                                                                    |
 | `open_hfq` / `high_hfq` / `low_hfq` / `close_hfq`                                 | `numeric(18,4)`     | 可空                      | 后复权 OHLC                                                                                                                                                                                                    |
-| `price_source`                                                                    | `text`              | 可空                      | 不复权 OHLC/volume 来源：`yfinance`（主写）/ `hongsehuojian`（红色火箭补缺 INSERT）/ `sse`（上交所官网纠偏）/ `adj_gap_fill`（历史缺复权回填）；`sse`/`szse` 行主写与 `adj_check` 不覆盖；`adj_check` 不改本列 |
+| `price_source`                                                                    | `text`              | 可空                      | 不复权 OHLC/volume 来源：`yfinance`（主写）/ `hongsehuojian`（红色火箭补缺 INSERT）/ `sse`（上交所官网纠偏）/ `adj_gap_fill`（历史缺复权回填）；`sse`/`szse` 时主写 UPSERT 不覆盖该行 OHLC；`adj_check` 仍可刷复权列、不改本列 |
 | `updated_at`                                                                      | `timestamptz`       | NOT NULL, DEFAULT `now()` | **价格侧**新鲜度                                                                                                                                                                                               |
 
 **索引：** `etf_daily_trade_date_idx`：`(trade_date DESC)`
@@ -345,7 +345,7 @@ etf_pool（只读，全表）
 yfinance（Yahoo；海外 runner 可用）
     │
     ├─ full / incremental → etf_daily（三种价 + price_source=yfinance；跳过已 sse/szse 行）
-    ├─ adj_check          → etf_daily（仅 UPDATE *_qfq/*_hfq；同样跳过官网锁定行）
+    ├─ adj_check          → etf_daily（仅 UPDATE *_qfq/*_hfq；含官网纠偏行，不改 OHLC/price_source）
     └─ sync_runs + artifacts/sync_etf_kline_summary.json → Bark
 
 红色火箭（见 hongsehuojian-fill-validate.md）
