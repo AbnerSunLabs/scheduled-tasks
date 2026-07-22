@@ -1,0 +1,29 @@
+README.md
+  s_4cb2ce6f406269::t_e5b938ccfd45d5 14,36
+doc/official-cross-check-design.md
+  s_4cb2ce6f406269::t_011c82e1953df2 11-16,37-43,47-51,59-64,68-73,95-101,118-119,121,123,125,130-131,133-135
+doc/official-cross-check.md
+  s_4cb2ce6f406269::t_76fed68a0971ab 9-13,18-19
+doc/supabase-schema.md
+  s_4cb2ce6f406269::t_3aa3a0dda3d409 319,371-372,385
+src/scheduled_tasks/db.py
+  s_4cb2ce6f406269::t_293096189fe165 19-24,361-365,371,401-402,413-416,422,435-436
+tests/test_etf_yfinance.py
+  s_4cb2ce6f406269::t_6f610778d4dc55 305-368
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "139b3555e87d2c59fa552a4397b22deb1d6387b1",
+  "prompts": {},
+  "sessions": {
+    "s_4cb2ce6f406269": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "48caf92c-9ed4-4008-b391-e3a891a699f8",
+        "model": "unknown"
+      },
+      "human_author": "AbnerSun <sunyujiejohn@sina.com>"
+    }
+  }
+}
