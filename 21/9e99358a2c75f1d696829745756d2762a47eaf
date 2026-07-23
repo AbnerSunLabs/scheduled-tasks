@@ -1,0 +1,21 @@
+src/scheduled_tasks/models/migrations/20260723_family_mental_accounts.sql
+  s_697c2c4aa3b89a::t_143eba22db8564 1-100
+src/scheduled_tasks/models/migrations/20260723_family_mental_accounts_target_date.sql
+  s_697c2c4aa3b89a::t_c904ae2256f97b 1-16
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "219e99358a2c75f1d696829745756d2762a47eaf",
+  "prompts": {},
+  "sessions": {
+    "s_697c2c4aa3b89a": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "5d60a631-283c-43af-bc3f-29361fd8fae4",
+        "model": "unknown"
+      },
+      "human_author": "AbnerSun <sunyujiejohn@sina.com>"
+    }
+  }
+}
