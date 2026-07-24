@@ -1,0 +1,19 @@
+src/scheduled_tasks/models/migrations/20260724_family_mental_accounts_priority_start_date.sql
+  s_0b53e6cbe93902::t_bd9368ef04e48a 1-46
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "261e116100ac458be63636c1e7122f6a64cf2119",
+  "prompts": {},
+  "sessions": {
+    "s_0b53e6cbe93902": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "ce492bbf-c439-4020-ad13-c7805ed3e7e8",
+        "model": "unknown"
+      },
+      "human_author": "AbnerSun <sunyujiejohn@sina.com>"
+    }
+  }
+}
