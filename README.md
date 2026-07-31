@@ -10,7 +10,7 @@ GitHub Actions 定时任务：将 **Yahoo Finance（yfinance）** ETF 日 K、�
 
 ### ETF 日 K
 
-- 从 `etf_pool` 读取当前池（排除黑名单后断言 18 只）。
+- 从 `etf_pool` 读取当前池（排除黑名单后断言 19 只）。
 - 写入 `etf_daily`：不复权 OHLCV + 前/后复权 OHLC + `price_source='yfinance'`；已官网纠偏（`sse`/`szse`）的行不覆盖。
 - 写入 `sync_runs`（`job_name=sync_etf_kline_yfinance`）。
 - 模式：`full` / `incremental` / `adj_check`。

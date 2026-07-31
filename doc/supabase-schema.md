@@ -41,19 +41,19 @@ RLS：
 
 ## 数据现状（live 快照）
 
-> 统计日期：**2026-07-20**（只读查询 live Supabase）。行数会随 job 变化；以当日为准。
+> 统计日期：**2026-07-31**（只读查询 live Supabase）。行数会随 job 变化；以当日为准。
 
 ### 表行数总览
 
 | 表                       | 行数       | 备注                                                                                        |
 | ------------------------ | ---------- | ------------------------------------------------------------------------------------------- |
-| `etf_pool`               | **18**     | 当前池断言 18 只；全部有 `tracking_index_code`                                              |
-| `etf_daily`              | **42 670** | 覆盖池内 18 码；日期 **2011-09-20 → 2026-07-17**                                            |
-| `indices`                | **18**     | 与池跟踪指数一一对应                                                                        |
-| `index_valuation`        | **14**     | 估值日均为 **2026-07-17**；缺 4 个跨境/主题指数                                             |
+| `etf_pool`               | **19**     | 当前池断言 19 只；全部有 `tracking_index_code`                                              |
+| `etf_daily`              | **43 626** | 覆盖池内 19 码；日期 **2011-09-20 → 2026-07-31**                                            |
+| `indices`                | **19**     | 与池跟踪指数一一对应                                                                        |
+| `index_valuation`        | **14**     | 最新估值日为 **2026-07-30**；部分跨境/主题指数无可靠估值                                    |
 | `index_industry_weights` | **1 003**  | **11** 个指数有权重；as_of 最新 **2026-04-30**                                              |
-| `index_daily_metrics`    | **5 951**  | **仅** `000300.SH`；日期 **2002-01-04 → 2026-07-17**                                        |
-| `sync_runs`              | **183**    | 含历史 `sync_indices` / `sync_etf_kline_baostock` / `sync_fx_rates_frankfurter` 等旧 job 名 |
+| `index_daily_metrics`    | **5 960**  | **仅** `000300.SH`；日期 **2002-01-04 → 2026-07-30**                                        |
+| `sync_runs`              | **227**    | 含历史 `sync_indices` / `sync_etf_kline_baostock` / `sync_fx_rates_frankfurter` 等旧 job 名 |
 | `portfolio_settings`     | **1**      | 账本里唯一有数据的表（`base_currency=CNY`）                                                 |
 | 其余账本 11 表           | **0**      | `etf_instruments` / `positions` / `trade_records` 等为空                                    |
 
@@ -63,13 +63,13 @@ RLS：
 
 | price_source    | 行数   | 日期范围                |
 | --------------- | ------ | ----------------------- |
-| `yfinance`      | 37 616 | 2011-09-20 → 2026-07-17 |
-| `hongsehuojian` | 5 042  | 2015-02-05 → 2026-07-17 |
+| `yfinance`      | 37 793 | 2011-09-20 → 2026-07-30 |
+| `hongsehuojian` | 5 821  | 2015-02-05 → 2026-07-31 |
 | `adj_gap_fill`  | 12     | 仅 2025-10-24           |
 
-池内 18 只 ETF 的 `close_qfq` / `close_hfq` **均无缺失**。最新交易日统一为 **2026-07-17**。
+池内 19 只 ETF 的 `close_qfq` / `close_hfq` **均无缺失**。18 只原池 ETF 最新交易日为 **2026-07-30**；新补的 `513970` 为 **2026-07-31**。
 
-### 当前 `etf_pool`（18）
+### 当前 `etf_pool`（19）
 
 | etf_code | 名称                           | 分类 | tracking_index_code | aum_yi | snapshot_date |
 | -------- | ------------------------------ | ---- | ------------------- | ------ | ------------- |
@@ -88,6 +88,7 @@ RLS：
 | 513100   | 国泰纳斯达克 100ETF            | 跨境 | NDX.NASDAQ          | 312    | 2026-07-16    |
 | 513180   | 华夏恒生科技 ETF               | 跨境 | HSTECH.HI           | 150    | 2026-07-16    |
 | 513500   | 博时标普 500ETF                | 跨境 | SPX.OTH             | 180    | 2026-07-16    |
+| 513970   | 景顺长城恒生消费 ETF（QDII）   | 跨境 | HSCGSI.HI           | —      | 2026-07-31    |
 | 515170   | 食品饮料 ETF                   | 行业 | 399396.SZ           | 120    | 2026-05-22    |
 | 562500   | 华夏中证机器人 ETF             | 行业 | H30590.CSI          | 55     | 2026-07-16    |
 | 588000   | 科创 50ETF                     | 宽基 | 000688.SH           | 918    | 2026-05-22    |
@@ -100,19 +101,19 @@ RLS：
 | 000688.SH / 000905.SH / 399006.SZ / 000991.SH / 000993.SH / 399396.SZ / 399971.SZ / 399975.SZ / 399989.SZ / 930955.CSI | ✓                 | ✓                        | —                     |
 | 000932.SH                                                                                                              | ✓                 | —                        | —                     |
 | HSI.HI / HSTECH.HI                                                                                                     | ✓                 | —                        | —                     |
-| H30533.CSI / H30590.CSI / NDX.NASDAQ / SPX.OTH                                                                         | —                 | —                        | —                     |
+| H30533.CSI / H30590.CSI / HSCGSI.HI / NDX.NASDAQ / SPX.OTH                                                           | —                 | —                        | —                     |
 
-- `indices.valuation_status`：当前 **18 行均为 `unknown`**（`valuation_source` / `valuation_checked_at` 为空）。
-- `index_daily_metrics` 来源：`price_source='hongsehuojian'`；其中 2 428 行同时有 `valuation_source='hongsehuojian'`（PE/PB 自 **2016-07-18** 起），其余 3 523 行仅有收盘点位。
+- `indices.valuation_status`：当前 **19 行均为 `unknown`**（`valuation_source` / `valuation_checked_at` 为空）。
+- `index_daily_metrics` 来源：`price_source='hongsehuojian'`；其中 3 023 行同时有 `valuation_source='hongsehuojian'`，其余 2 937 行仅有收盘点位。
 - 视图 `index_latest_snapshot` / `index_detail_snapshot` **尚未改挂** `index_daily_metrics`：收盘相关列 / `latest_price_date` 仍恒为 `null`，估值仍来自 `index_valuation`。
 
 ### 近期 `sync_runs`（按 job，含历史名）
 
 | job_name                           | success  | failed / partial     | 最近成功（UTC） |
 | ---------------------------------- | -------- | -------------------- | --------------- |
-| `sync_hongsehuojian_fill_validate` | 40       | 3 failed             | 2026-07-19      |
-| `sync_etf_kline_yfinance`          | 4        | 7 failed             | 2026-07-19      |
-| `sync_official_cross_check`        | 6        | 3 failed + 6 partial | 2026-07-17      |
+| `sync_hongsehuojian_fill_validate` | 53       | 3 failed             | 2026-07-31      |
+| `sync_etf_kline_yfinance`          | 23       | 9 failed             | 2026-07-30      |
+| `sync_official_cross_check`        | 15       | 3 failed + 6 partial | 2026-07-30      |
 | `sync_fx_rates_frankfurter` 等旧名 | 有历史行 | —                    | 已停用，仅留痕  |
 | `sync_etf_kline_baostock` 等旧名   | 有历史行 | —                    | 已停用，仅留痕  |
 
@@ -273,7 +274,7 @@ erDiagram
 
 > 原名 `etf_pool_snapshots`（2026-07-15 更名）。主键仅为 `etf_code` → **当前池**（每标的一行），**不是**按日多版本历史快照。读池必须 **全表直读**，禁止 `where snapshot_date = max(...)`。列名 `snapshot_date` 表示「元数据最近刷新日」，非快照版本键。
 >
-> `tracking_index_code` 回填见 `migrations/20260716_backfill_etf_pool_tracking_index.sql`（job 仍只读本表；元数据补齐用迁移/SQL）。池组成调整见 `migrations/20260717_etf_pool_replace_medical_drop_metals_nev.sql`、`migrations/20260718_drop_sse50_etf_510050.sql`、`migrations/20260718_drop_pv_etf_515790.sql` 与 `migrations/20260718_etf_pool_swap_bank_semi_ai_for_it_div.sql`（出池银行/半导体/AI，入池全指信息 `159939` + 红利低波 100 `159307`；当前池断言 **18** 只）。出池标的关联行情清理见 `migrations/20260717_purge_removed_etf_related_data.sql`。不在池内的残留指数清理见 `migrations/20260718_purge_orphan_indices.sql`。**增删 ETF 须同步增删其独占跟踪指数**（见 `.cursor/rules/etf-pool-index-lifecycle.mdc`）。跨境指数（`*.HI` / `H*.CSI` / `NASDAQ` / `OTH`）可进 `etf_pool` 与 `indices`（live 约束已放宽）。
+> `tracking_index_code` 回填见 `migrations/20260716_backfill_etf_pool_tracking_index.sql`（job 仍只读本表；元数据补齐用迁移/SQL）。池组成调整见 `migrations/20260717_etf_pool_replace_medical_drop_metals_nev.sql`、`migrations/20260718_drop_sse50_etf_510050.sql`、`migrations/20260718_drop_pv_etf_515790.sql`、`migrations/20260718_etf_pool_swap_bank_semi_ai_for_it_div.sql` 与 `migrations/20260731_add_hang_seng_consumption_etf_513970.sql`（新增恒生消费 ETF `513970`；当前池断言 **19** 只）。出池标的关联行情清理见 `migrations/20260717_purge_removed_etf_related_data.sql`。不在池内的残留指数清理见 `migrations/20260718_purge_orphan_indices.sql`。**增删 ETF 须同步增删其独占跟踪指数**（见 `.cursor/rules/etf-pool-index-lifecycle.mdc`）。跨境指数（`*.HI` / `H*.CSI` / `NASDAQ` / `OTH`）可进 `etf_pool` 与 `indices`（live 约束已放宽）。
 
 | 列名                    | 类型          | 约束                         | 说明                                   |
 | ----------------------- | ------------- | ---------------------------- | -------------------------------------- |
@@ -419,6 +420,9 @@ psql "$DATABASE_URL" -f src/scheduled_tasks/models/migrations/20260718_drop_pv_e
 
 # 出池银行/半导体/AI，入池全指信息 + 红利低波100（断言 18 只）
 psql "$DATABASE_URL" -f src/scheduled_tasks/models/migrations/20260718_etf_pool_swap_bank_semi_ai_for_it_div.sql
+
+# 入池恒生消费 ETF 513970 + 恒生消费指数（池断言调整为 19 只）
+psql "$DATABASE_URL" -f src/scheduled_tasks/models/migrations/20260731_add_hang_seng_consumption_etf_513970.sql
 
 # 清理不在当前池的残留 indices（+ index_valuation；行业权重 CASCADE）
 psql "$DATABASE_URL" -f src/scheduled_tasks/models/migrations/20260718_purge_orphan_indices.sql
