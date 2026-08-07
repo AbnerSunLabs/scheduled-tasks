@@ -1,0 +1,19 @@
+doc/supabase-schema.md
+  s_e46d264967b9d5::t_15848576317a82 44-47
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "c17bcfd09a6f893c960b91c83eb63657e46ceef5",
+  "prompts": {},
+  "sessions": {
+    "s_e46d264967b9d5": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "b395ce73-ae6e-43c9-bf8c-7d35e3b4ce03",
+        "model": "unknown"
+      },
+      "human_author": "AbnerSun <sunyujiejohn@sina.com>"
+    }
+  }
+}
