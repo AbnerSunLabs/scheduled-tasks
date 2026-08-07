@@ -1,0 +1,21 @@
+doc/supabase-schema.md
+  s_e46d264967b9d5::t_fa9fca6c84171a 11,16
+src/scheduled_tasks/models/migrations/20260807_grid_strategies.sql
+  s_e46d264967b9d5::t_9748ac40b73845 1-91
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "263f4e51111119fb7ee84e5de0407812099d7b47",
+  "prompts": {},
+  "sessions": {
+    "s_e46d264967b9d5": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "b395ce73-ae6e-43c9-bf8c-7d35e3b4ce03",
+        "model": "unknown"
+      },
+      "human_author": "AbnerSun <sunyujiejohn@sina.com>"
+    }
+  }
+}
