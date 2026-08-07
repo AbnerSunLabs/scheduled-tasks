@@ -8,10 +8,12 @@
 - **ETF 相关表**：定义见 `schema.sql`；`etf_daily` 价格由 `sync_etf_kline_yfinance` 主写，`etf_pool` 只读；红色火箭可对缺失日 INSERT（`price_source='hongsehuojian'`），不覆盖已有行情行。
 - **汇率**：`fx_rates` **已下线**（job 已移除；`migrations/20260721_drop_fx_rates.sql`）。历史 run 可能仍出现 `sync_fx_rates_frankfurter`。
 - **驾驶舱用户账本 12 表**：DDL + RLS 见 `migrations/20260710_cockpit_ledger_and_fx_rates.sql`（历史文件名保留；曾含 `fx_rates`）；**业务行由 `stock-charts` UI 写入**，本仓库不写账本数据。
+- **网格计算器保存表 `grid_strategies`**：DDL + RLS 见 `migrations/20260807_grid_strategies.sql`；保存命名配置与成功结果快照，**不是** `grid_plans` 交易执行账本；**业务行由 `stock-charts` UI 写入**，本仓库不写业务数据。
 
 RLS：
 
 - 账本表：`authenticated` 仅能读写 `user_id = auth.uid()` 的行。
+- `grid_strategies`：`authenticated` 仅能 CRUD `user_id = auth.uid()` 的行；**不走**家庭财务白名单；`public` / `anon` 无表权限。
 - 已授权共享只读（`authenticated` SELECT；job 经 `DATABASE_URL` 写入）：`etf_daily`、`etf_pool`、`indices`。
 - 指数仪表盘公开读：`20260718_index_market_anon_read.sql` 为 `index_valuation`、`index_industry_weights`、`etf_daily`、`etf_pool`、`indices` 补 `anon` + `authenticated` SELECT policy（幂等）。
 - `index_daily_metrics`：`20260721_add_index_daily_metrics.sql` 补 `anon`/`authenticated` SELECT（与 Live policy 同名）；`indices` 上仍保留历史 policy `Allow public read indices`（与 `indices_select_*` 并存，效果均为公开 SELECT）。
