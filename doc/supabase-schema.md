@@ -41,6 +41,10 @@ RLS：
 
 `portfolio_settings`、`target_allocations`、`etf_instruments`、`positions`、`trade_records`、`cash_flows`、`cash_accounts`、`rebalance_plans`、`grid_plans`、`review_entries`、`decision_logs`、`portfolio`。
 
+### 网格计算器保存表（DDL only）
+
+`grid_strategies`：用户命名的网格配置（`config` JSONB）与当次成功结果快照（`result_snapshot` JSONB）；同用户名称按 `lower(btrim(name))` 唯一；本期 `schema_version` 仅允许 `1`。详见 `migrations/20260807_grid_strategies.sql` 与 `stock-charts` 侧 design spec。
+
 ## 数据现状（live 快照）
 
 > 统计日期：**2026-07-31**（只读查询 live Supabase）。行数会随 job 变化；以当日为准。
