@@ -1,0 +1,20 @@
+doc/supabase-schema.md
+  s_04988e2524ccb1::t_a1eb3642577e76 389-390
+  s_04988e2524ccb1::t_22f0d2fcfa1625 11
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "e1df11b50634f0c185dbfa1fa65ed59944802f7f",
+  "prompts": {},
+  "sessions": {
+    "s_04988e2524ccb1": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "9076eefe-c7ee-41ce-b18b-140fcfe57e0c",
+        "model": "grok-4.6"
+      },
+      "human_author": "AbnerSun <sunyujiejohn@sina.com>"
+    }
+  }
+}
