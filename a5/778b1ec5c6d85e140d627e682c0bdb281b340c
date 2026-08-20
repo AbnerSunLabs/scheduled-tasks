@@ -1,0 +1,46 @@
+pyproject.toml
+  s_04988e2524ccb1::t_9b4e4ca22a5259 4
+README.md
+  s_04988e2524ccb1::t_bc1a6222a7b2c0 3,5
+  s_04988e2524ccb1::t_69f844452d96e6 39,41-42
+  s_04988e2524ccb1::t_50ee1b9e2713d6 67,71
+src/scheduled_tasks/models/schema.sql
+  s_04988e2524ccb1::t_b69951a478f88a 128-129
+doc/supabase-verification.md
+  s_04988e2524ccb1::t_a571f45b05e1a7 88
+  s_04988e2524ccb1::t_012df64f723e50 74
+  s_04988e2524ccb1::t_8c2e2de6e73d12 32,36
+src/scheduled_tasks/models/migrations/20260710_cockpit_ledger_and_fx_rates.sql
+  s_04988e2524ccb1::t_fcb48a98d11465 1,5-7
+src/scheduled_tasks/models/migrations/20260820_drop_cockpit_ledger.sql
+  s_04988e2524ccb1::t_b611dae0d539f3 1-25
+.github/workflows/apply-cockpit-migration.yml
+  s_04988e2524ccb1::t_adfb8f6f040f31 4-5
+  s_04988e2524ccb1::t_aa26a3fc057520 83,117-132,134-135
+  s_04988e2524ccb1::t_a9f558e78b8097 91,96,98,103-104,111-116,133,136-138
+  s_04988e2524ccb1::t_67ebb867d459a0 90
+doc/supabase-schema.md
+  s_04988e2524ccb1::t_b54bfe8421df3f 14,18
+  s_04988e2524ccb1::t_e0834c40028d58 448-450
+  s_04988e2524ccb1::t_d8c587ecc33bee 10
+  s_04988e2524ccb1::t_9b1c5719ad405a 37
+  s_04988e2524ccb1::t_62900f830eda28 55
+  s_04988e2524ccb1::t_2d32ab7c4321b0 373,376,378
+  s_04988e2524ccb1::t_4ca0db203e073a 455
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "a5778b1ec5c6d85e140d627e682c0bdb281b340c",
+  "prompts": {},
+  "sessions": {
+    "s_04988e2524ccb1": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "9076eefe-c7ee-41ce-b18b-140fcfe57e0c",
+        "model": "grok-4.6"
+      },
+      "human_author": "AbnerSun <sunyujiejohn@sina.com>"
+    }
+  }
+}
