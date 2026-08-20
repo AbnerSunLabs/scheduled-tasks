@@ -29,10 +29,11 @@ select count(*) from etf_pool;
 
 GitHub Actions：workflow `应用驾驶舱 Migration`，勾选 `apply_rename_migration` 后手动触发。
 
-6. **驾驶舱账本 12 表 + 共享表 RLS**（新库与已有库均需；`schema.sql` 不含账本表与 RLS）：
+6. **共享表 RLS + 下线账本 12 表**（新库与已有库均需；`schema.sql` 不含 RLS；20260710 仍会建账本表）：
 
 ```bash
 psql "$DATABASE_URL" -f src/scheduled_tasks/models/migrations/20260710_cockpit_ledger_and_fx_rates.sql
+psql "$DATABASE_URL" -f src/scheduled_tasks/models/migrations/20260820_drop_cockpit_ledger.sql
 psql "$DATABASE_URL" -f src/scheduled_tasks/models/migrations/20260718_etf_pool_authenticated_read.sql
 psql "$DATABASE_URL" -f src/scheduled_tasks/models/migrations/20260718_index_market_anon_read.sql
 ```
@@ -70,7 +71,7 @@ psql "$DATABASE_URL" -f src/scheduled_tasks/models/migrations/20260716_add_chine
 - `etf_pool`
 - `etf_daily`（复权 8 列 + `price_source`；无成交额列 / 无闲置净值侧列）
 - `index_valuation`（红色火箭可写）
-- 账本 12 表（DDL only；见 `20260710_cockpit_ledger_and_fx_rates.sql`）
+- 确认 **不存在** 驾驶舱账本 12 表（`20260820_drop_cockpit_ledger.sql`）：`portfolio_settings` / `etf_instruments` / `target_allocations` / `positions` / `cash_accounts` / `rebalance_plans` / `grid_plans` / `decision_logs` / `trade_records` / `cash_flows` / `review_entries` / `portfolio`
 - 确认 **不存在** `fx_rates`（`20260721_drop_fx_rates.sql`）
 - 确认 **不存在** `index_daily_prices`（`20260718_drop_index_daily_prices.sql`）
 - 确认 **不存在** `index_daily_valuations`（已由 `20260717_drop_index_daily_valuations.sql` 删除）
@@ -84,7 +85,7 @@ psql "$DATABASE_URL" -f src/scheduled_tasks/models/migrations/20260716_add_chine
 - `index_latest_snapshot`
 - `index_detail_snapshot`
 
-12. Confirm 旧表名 `etf_grid_*` 与 `etf_pool_snapshots` **不存在**；主键约束名为 `etf_*_pkey` / `etf_pool_pkey` / `index_valuation_pkey` / `portfolio_pkey`。
+12. Confirm 旧表名 `etf_grid_*` 与 `etf_pool_snapshots` **不存在**；主键约束名为 `etf_*_pkey` / `etf_pool_pkey` / `index_valuation_pkey`。
 13. Confirm 索引存在：`etf_daily_trade_date_idx`、`etf_pool_snapshot_date_idx`、`idx_index_daily_metrics_trade_date`。
 14. Confirm 中文注释已挂上（按列名抽查）：
 

@@ -7,17 +7,17 @@
   - `indices` 增列：`valuation_status` / `valuation_status_reason` / `valuation_source` / `valuation_checked_at`（远程 migration 名 `index_valuation_status`）。
 - **ETF 相关表**：定义见 `schema.sql`；`etf_daily` 价格由 `sync_etf_kline_yfinance` 主写，`etf_pool` 只读；红色火箭可对缺失日 INSERT（`price_source='hongsehuojian'`），不覆盖已有行情行。
 - **汇率**：`fx_rates` **已下线**（job 已移除；`migrations/20260721_drop_fx_rates.sql`）。历史 run 可能仍出现 `sync_fx_rates_frankfurter`。
-- **驾驶舱用户账本 12 表**：DDL + RLS 见 `migrations/20260710_cockpit_ledger_and_fx_rates.sql`（历史文件名保留；曾含 `fx_rates`）；**业务行由 `stock-charts` UI 写入**，本仓库不写账本数据。
-- **网格计算器保存表 `grid_strategies`**：DDL + RLS 见 `migrations/20260807_grid_strategies.sql`；保存命名配置与成功结果快照，**不是** `grid_plans` 交易执行账本；**业务行由 `stock-charts` UI 写入**，本仓库不写业务数据。
+- **驾驶舱用户账本 12 表已下线**（`migrations/20260820_drop_cockpit_ledger.sql`）。历史 DDL 仍在 `20260710_cockpit_ledger_and_fx_rates.sql`（该文件仍提供 `cockpit_apply_*` 与共享行情 RLS）；跑完 20260710 后必须再跑 drop。不删 `family_*` / `insurance_policies` / `grid_strategies`。
+- **网格计算器保存表 `grid_strategies`**：DDL + RLS 见 `migrations/20260807_grid_strategies.sql`；保存命名配置与成功结果快照，**不是**已下线的 `grid_plans` 交易执行账本；**业务行由 `stock-charts` UI 写入**，本仓库不写业务数据。
 
 RLS：
 
-- 账本表：`authenticated` 仅能读写 `user_id = auth.uid()` 的行。
+- 家庭财务表：`authenticated` 仅能读写 `user_id = auth.uid()` 的行（`cockpit_apply_owner_rls`）。
 - `grid_strategies`：`authenticated` 仅能 CRUD `user_id = auth.uid()` 的行；**不走**家庭财务白名单；`public` / `anon` 无表权限。
 - 已授权共享只读（`authenticated` SELECT；job 经 `DATABASE_URL` 写入）：`etf_daily`、`etf_pool`、`indices`。
 - 指数仪表盘公开读：`20260718_index_market_anon_read.sql` 为 `index_valuation`、`index_industry_weights`、`etf_daily`、`etf_pool`、`indices` 补 `anon` + `authenticated` SELECT policy（幂等）。
 - `index_daily_metrics`：`20260721_add_index_daily_metrics.sql` 补 `anon`/`authenticated` SELECT（与 Live policy 同名）；`indices` 上仍保留历史 policy `Allow public read indices`（与 `indices_select_*` 并存，效果均为公开 SELECT）。
-- `schema.sql` 本身不含完整 RLS；已有库请执行 `20260710_cockpit_ledger_and_fx_rates.sql`，并补跑 `20260718_etf_pool_authenticated_read.sql`、`20260718_index_market_anon_read.sql` 与 `20260721_add_index_daily_metrics.sql`。
+- `schema.sql` 本身不含完整 RLS；已有库请执行 `20260710_cockpit_ledger_and_fx_rates.sql`，**紧接着** `20260820_drop_cockpit_ledger.sql`，并补跑 `20260718_etf_pool_authenticated_read.sql`、`20260718_index_market_anon_read.sql` 与 `20260721_add_index_daily_metrics.sql`。
 
 > 已有库若仍为 `etf_grid_*` 旧名，请先执行：
 > `psql "$DATABASE_URL" -f src/scheduled_tasks/models/migrations/20260709_etf_rename_and_adj_columns.sql`
@@ -33,13 +33,10 @@ RLS：
 | 表   | `etf_pool`               | ETF 当前池（PK=`etf_code`，非历史快照）              | **只读**                          |
 | 表   | `etf_daily`              | ETF 日行情（OHLC + volume + 前/后复权 + 来源）       | **主写**                          |
 | 表   | `index_valuation`        | 跟踪指数估值快照（当日/5y/10y PE）                   | **红色火箭可写**                  |
-| 表   | 账本 12 表               | 见 migration；UI 写入                                | **DDL only**                      |
 | 视图 | `index_latest_snapshot`  | 指数最新快照（价列仍恒 null + `index_valuation` PE） | 可读                              |
 | 视图 | `index_detail_snapshot`  | 指数各维度最新日期（`latest_price_date` 仍恒 null）  | 可读                              |
 
-### 账本 12 表（DDL only）
-
-`portfolio_settings`、`target_allocations`、`etf_instruments`、`positions`、`trade_records`、`cash_flows`、`cash_accounts`、`rebalance_plans`、`grid_plans`、`review_entries`、`decision_logs`、`portfolio`。
+驾驶舱账本 12 表（`portfolio_settings` 等）**已删除**，见 `20260820_drop_cockpit_ledger.sql`。
 
 ### 网格计算器保存表（DDL only）
 
@@ -60,10 +57,8 @@ RLS：
 | `index_industry_weights` | **1 003**  | **11** 个指数有权重；as_of 最新 **2026-04-30**                                              |
 | `index_daily_metrics`    | **5 960**  | **仅** `000300.SH`；日期 **2002-01-04 → 2026-07-30**                                        |
 | `sync_runs`              | **227**    | 含历史 `sync_indices` / `sync_etf_kline_baostock` / `sync_fx_rates_frankfurter` 等旧 job 名 |
-| `portfolio_settings`     | **1**      | 账本里唯一有数据的表（`base_currency=CNY`）                                                 |
-| 其余账本 11 表           | **0**      | `etf_instruments` / `positions` / `trade_records` 等为空                                    |
 
-> `fx_rates` 已下线（Live 上 `to_regclass('public.fx_rates')` 应为 null）。
+> `fx_rates` 与驾驶舱账本 12 表已下线（Live 上 `to_regclass` 应为 null）。
 
 ### `etf_daily.price_source` 分布
 
@@ -381,15 +376,18 @@ yfinance（Yahoo；海外 runner 可用）
 ## 初始化与维护
 
 ```bash
-# 新库（表 DDL + 当前指数视图；不含账本 12 表、不含 RLS）
+# 新库（表 DDL + 当前指数视图；不含账本表、不含 RLS）
 psql "$DATABASE_URL" -f src/scheduled_tasks/models/schema.sql
 
-# 驾驶舱账本 12 表 + 共享表 RLS（新库与已有库均需；历史文件名曾含 fx_rates）
+# 共享表 RLS 函数（新库与已有库均需；历史文件会建账本 12 表，下一行立刻 drop）
 psql "$DATABASE_URL" -f src/scheduled_tasks/models/migrations/20260710_cockpit_ledger_and_fx_rates.sql
+psql "$DATABASE_URL" -f src/scheduled_tasks/models/migrations/20260820_drop_cockpit_ledger.sql
 # 补 etf_pool authenticated 只读（幂等；新库 schema 建 etf_pool 时旧版 20260710 可能漏配）
 psql "$DATABASE_URL" -f src/scheduled_tasks/models/migrations/20260718_etf_pool_authenticated_read.sql
 # 指数日指标表 + 公开读 RLS（新库若已跑最新 schema.sql 仍建议执行以补 RLS）
 psql "$DATABASE_URL" -f src/scheduled_tasks/models/migrations/20260721_add_index_daily_metrics.sql
+# 网格计算器保存表（新库与已有库均需；与账本 drop 独立）
+psql "$DATABASE_URL" -f src/scheduled_tasks/models/migrations/20260807_grid_strategies.sql
 # 下线汇率表（幂等；Live 若已 drop 则为 no-op）
 psql "$DATABASE_URL" -f src/scheduled_tasks/models/migrations/20260721_drop_fx_rates.sql
 
@@ -455,11 +453,14 @@ psql "$DATABASE_URL" -f src/scheduled_tasks/models/migrations/20260721_add_index
 
 # 下线 fx_rates（若上面初始化段已跑可跳过）
 psql "$DATABASE_URL" -f src/scheduled_tasks/models/migrations/20260721_drop_fx_rates.sql
+
+# 下线驾驶舱账本 12 表（若上面初始化段已跑可跳过）
+psql "$DATABASE_URL" -f src/scheduled_tasks/models/migrations/20260820_drop_cockpit_ledger.sql
 ```
 
 `CREATE TABLE IF NOT EXISTS` **不会**给已存在表加列或改名；已有库必须以 migrations 为准。
 
-列名保持英文；中文说明通过 PostgreSQL `COMMENT ON` 挂在表/列上（见 `20260716_add_chinese_comments.sql`），覆盖共享行情表、账本 12 表及指数视图。
+列名保持英文；中文说明通过 PostgreSQL `COMMENT ON` 挂在表/列上（见 `20260716_add_chinese_comments.sql`），覆盖共享行情表、家庭财务表及指数视图（账本 12 表注释在 drop 后为 no-op）。
 
 ---
 

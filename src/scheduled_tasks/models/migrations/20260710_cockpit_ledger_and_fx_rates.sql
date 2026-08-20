@@ -1,8 +1,10 @@
--- ETF 投资驾驶舱：用户账本 12 表 + fx_rates + RLS
+-- ETF 投资驾驶舱：用户账本 12 表 + fx_rates + RLS（历史文件，勿改表结构）
 -- 目标库：Supabase Postgres（需已有 auth.users）
 -- 幂等：可重复执行（create if not exists / drop policy if exists）
 -- 注意：CREATE TABLE IF NOT EXISTS 不会给已存在表补列/改约束；结构变更请另开新 migration。
--- 账本数据由 stock-charts UI 经 Auth/RLS 写入；本仓库 job 只写 fx_rates
+-- 账本 12 表已下线：见 20260820_drop_cockpit_ledger.sql（本文件仍会建表，之后必须再跑 drop）。
+-- fx_rates 已下线：见 20260721_drop_fx_rates.sql。
+-- 本文件仍负责：cockpit_apply_* 函数 + 共享行情 authenticated 只读 RLS。
 
 -- ---------------------------------------------------------------------------
 -- 共享：汇率

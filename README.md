@@ -1,8 +1,8 @@
 # scheduled-tasks
 
-GitHub Actions 定时任务：将 **Yahoo Finance（yfinance）** ETF 日 K、以及 **红色火箭** 指数估值同步到 Supabase PostgreSQL；并维护 ETF 投资驾驶舱所需的**用户账本 DDL / RLS**（业务数据仍由 `stock-charts` UI 写入）。
+GitHub Actions 定时任务：将 **Yahoo Finance（yfinance）** ETF 日 K、以及 **红色火箭** 指数估值同步到 Supabase PostgreSQL；并维护共享行情表的 **RLS**（`cockpit_apply_*` 函数仍由历史 migration 提供）。
 
-> 说明：ETF **价格**主源为 yfinance；补缺 / 估值 / 行业权重由红色火箭写入。汇率同步与 `fx_rates` 表已下线。不再使用 BaoStock / AKShare；`etf_daily` 不维护成交额；**无交易日历表**。工作日 GHA `schedule`（定时）启动前用公开 HTTP 判定是否交易日（休市跳过；查询失败则照跑并 Bark 警告），见 [doc/ashare-trading-day-gate.md](./doc/ashare-trading-day-gate.md)。
+> 说明：ETF **价格**主源为 yfinance；补缺 / 估值 / 行业权重由红色火箭写入。汇率同步与 `fx_rates` 表已下线。驾驶舱用户账本 12 表已下线。不再使用 BaoStock / AKShare；`etf_daily` 不维护成交额；**无交易日历表**。工作日 GHA `schedule`（定时）启动前用公开 HTTP 判定是否交易日（休市跳过；查询失败则照跑并 Bark 警告），见 [doc/ashare-trading-day-gate.md](./doc/ashare-trading-day-gate.md)。
 
 本仓库独立于 `stock-view` / `stock-charts`。旧指数日线表 `index_daily_prices` 已删除；`index_daily_metrics` 存收盘/PE/PB（Phase 1 主跑沪深 300）。红色火箭 job `sync_hongsehuojian_fill_validate` 可刷新 `index_valuation` 与 `index_daily_metrics` PE/PB。表结构见 [doc/supabase-schema.md](./doc/supabase-schema.md)。
 
@@ -36,11 +36,11 @@ GitHub Actions 定时任务：将 **Yahoo Finance（yfinance）** ETF 日 K、�
 - 上交所（ETF）+ 中证（指数）vs 库；默认只比对告警，`--apply-official --yes` 才纠偏；纠偏后主写不覆盖不复权 OHLC，`adj_check` 仍可刷复权列。
 - 入口：`python -m scheduled_tasks.jobs.sync_official_cross_check`（见 [doc/official-cross-check.md](doc/official-cross-check.md)）
 
-### 驾驶舱账本 DDL
+### 共享 RLS（历史 cockpit migration）
 
-- Migration：`src/scheduled_tasks/models/migrations/20260710_cockpit_ledger_and_fx_rates.sql`（历史文件名保留；账本 12 表 + 曾含 `fx_rates`）
+- 函数与共享表 policy：`src/scheduled_tasks/models/migrations/20260710_cockpit_ledger_and_fx_rates.sql`（历史文件名保留；曾建账本 12 表与 `fx_rates`）
+- 下线账本 12 表：`20260820_drop_cockpit_ledger.sql`（跑完 20260710 后必须再跑，避免空表被重建）
 - 下线汇率：`20260721_drop_fx_rates.sql`
-- **不**在本仓库写入账本业务行。
 
 成功/失败均通过 **Bark** 推送（`BARK_KEY`）；无邮箱通知 step。
 
@@ -64,10 +64,11 @@ Do not print secret values in logs, documents, issue comments, or chat.
 psql "$DATABASE_URL" -f src/scheduled_tasks/models/migrations/20260709_etf_rename_and_adj_columns.sql
 ```
 
-3. 驾驶舱账本 + RLS（**已有库必跑**）：
+3. 共享 RLS（**已有库必跑**；20260710 仍会建账本表，紧接着 drop）：
 
 ```bash
 psql "$DATABASE_URL" -f src/scheduled_tasks/models/migrations/20260710_cockpit_ledger_and_fx_rates.sql
+psql "$DATABASE_URL" -f src/scheduled_tasks/models/migrations/20260820_drop_cockpit_ledger.sql
 psql "$DATABASE_URL" -f src/scheduled_tasks/models/migrations/20260718_etf_pool_authenticated_read.sql
 psql "$DATABASE_URL" -f src/scheduled_tasks/models/migrations/20260718_index_market_anon_read.sql
 psql "$DATABASE_URL" -f src/scheduled_tasks/models/migrations/20260721_add_index_daily_metrics.sql

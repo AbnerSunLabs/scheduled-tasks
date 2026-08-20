@@ -1,7 +1,8 @@
 name: 应用驾驶舱 Migration
 
 # 部署顺序（绑定，自上而下）：
-#   1. 20260710_cockpit_ledger_and_fx_rates.sql
+#   1. 20260710_cockpit_ledger_and_fx_rates.sql（历史：会建账本 12 表 + 共享 RLS 函数）
+#   1a. 20260820_drop_cockpit_ledger.sql（紧随其后下线账本 12 表；幂等）
 #   1b. 20260718_etf_pool_authenticated_read.sql（补 etf_pool RLS/GRANT；幂等）
 #   1c. 20260718_index_market_anon_read.sql（补指数仪表盘共享表公开读；幂等）
 #   2. 20260715_rename_etf_pool_snapshots_to_etf_pool.sql（独立步骤，幂等）
@@ -79,7 +80,7 @@ jobs:
             exit 1
           fi
 
-      - name: Apply cockpit ledger migration
+      - name: Apply shared RLS then drop cockpit ledger
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: |
@@ -87,27 +88,54 @@ jobs:
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 \
             -f src/scheduled_tasks/models/migrations/20260710_cockpit_ledger_and_fx_rates.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 \
+            -f src/scheduled_tasks/models/migrations/20260820_drop_cockpit_ledger.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 \
             -f src/scheduled_tasks/models/migrations/20260718_etf_pool_authenticated_read.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 \
             -f src/scheduled_tasks/models/migrations/20260718_index_market_anon_read.sql
-          echo "cockpit ledger + shared market read migrations applied"
+          echo "cockpit shared RLS + drop ledger migrations applied"
 
-      - name: Verify cockpit ledger tables exist
+      - name: Verify cockpit ledger tables dropped
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: |
           set -euo pipefail
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c "
-            select tablename
+          leftover="$(psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -At -c "
+            select coalesce(string_agg(tablename, ',' order by tablename), '')
             from pg_tables
             where schemaname = 'public'
               and tablename in (
                 'portfolio_settings', 'target_allocations', 'etf_instruments', 'positions',
                 'trade_records', 'cash_flows', 'cash_accounts', 'rebalance_plans',
                 'grid_plans', 'review_entries', 'decision_logs', 'portfolio'
-              )
-            order by tablename;
-          "
+              );
+          ")"
+          if [ -n "$leftover" ]; then
+            echo "::error::expected cockpit ledger tables dropped; still present: $leftover"
+            exit 1
+          fi
+          fns="$(psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -At -c "
+            select string_agg(p.proname, ',' order by p.proname)
+            from pg_proc p
+            join pg_namespace n on n.oid = p.pronamespace
+            where n.nspname = 'public'
+              and p.proname in (
+                'cockpit_apply_owner_rls',
+                'cockpit_apply_authenticated_read'
+              );
+          ")"
+          if [ "$fns" != "cockpit_apply_authenticated_read,cockpit_apply_owner_rls" ]; then
+            echo "::error::expected cockpit_apply_* helpers to remain; got '${fns:-<null>}'"
+            exit 1
+          fi
+          market="$(psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -At -c "
+            select coalesce(to_regclass('public.etf_daily')::text, '');
+          ")"
+          if [ -z "$market" ]; then
+            echo "::error::public.etf_daily missing after cockpit ledger drop"
+            exit 1
+          fi
+          echo "cockpit ledger drop verification passed"
 
       - name: Apply etf_pool rename migration
         if: inputs.apply_rename_migration == true

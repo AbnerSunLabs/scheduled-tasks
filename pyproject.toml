@@ -1,7 +1,7 @@
 [project]
 name = "scheduled-tasks"
 version = "0.1.0"
-description = "GitHub Actions jobs: ETF daily bars (yfinance) and FX rates (Frankfurter) into Supabase; cockpit ledger DDL/RLS."
+description = "GitHub Actions jobs: ETF daily bars (yfinance) and index valuation into Supabase."
 requires-python = ">=3.11"
 dependencies = [
   "certifi>=2024.0.0",

@@ -125,8 +125,8 @@ create table if not exists index_valuation (
   updated_at timestamptz not null default now()
 );
 
--- 用户账本 12 表（依赖 auth.users）不放本文件，见：
--- models/migrations/20260710_cockpit_ledger_and_fx_rates.sql
+-- 驾驶舱用户账本 12 表已下线：见 migrations/20260820_drop_cockpit_ledger.sql
+-- （历史 DDL 仍在 20260710_cockpit_ledger_and_fx_rates.sql；跑完须再跑 drop）
 -- fx_rates 已下线：见 migrations/20260721_drop_fx_rates.sql
 
 -- 指数视图：日线表已删除；收盘相关列固定为 null，估值挂 index_valuation。
