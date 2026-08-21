@@ -1,0 +1,21 @@
+doc/supabase-verification.md
+  s_04988e2524ccb1::t_32a3df2abd4dba 74
+src/scheduled_tasks/models/migrations/20260716_add_chinese_comments.sql
+  s_04988e2524ccb1::t_47045837dde7ec 216
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "e50144ae863990a7a7df96e439bab639ad4b57ed",
+  "prompts": {},
+  "sessions": {
+    "s_04988e2524ccb1": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "9076eefe-c7ee-41ce-b18b-140fcfe57e0c",
+        "model": "grok-4.6"
+      },
+      "human_author": "AbnerSun <sunyujiejohn@sina.com>"
+    }
+  }
+}
