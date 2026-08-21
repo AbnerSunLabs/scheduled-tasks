@@ -213,7 +213,7 @@ select public._tmp_comment_if_exists('column', 'public.trade_calendar.is_open', 
 select public._tmp_comment_if_exists('column', 'public.trade_calendar.updated_at', '行更新时间');
 
 -- ===========================================================================
--- 驾驶舱账本 12 表
+-- 驾驶舱账本 12 表（20260820 已 DROP；下列 COMMENT 经 _tmp_comment_if_exists，表不存在则为 no-op）
 -- ===========================================================================
 select public._tmp_comment_if_exists('table', 'public.portfolio_settings', '组合设置（每用户一行）');
 select public._tmp_comment_if_exists('column', 'public.portfolio_settings.id', '主键');

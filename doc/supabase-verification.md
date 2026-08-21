@@ -71,6 +71,7 @@ psql "$DATABASE_URL" -f src/scheduled_tasks/models/migrations/20260716_add_chine
 - `etf_pool`
 - `etf_daily`（复权 8 列 + `price_source`；无成交额列 / 无闲置净值侧列）
 - `index_valuation`（红色火箭可写）
+- `grid_strategies`（网格计算器保存；`20260807_grid_strategies.sql`；本仓库不写业务行）
 - 确认 **不存在** 驾驶舱账本 12 表（`20260820_drop_cockpit_ledger.sql`）：`portfolio_settings` / `etf_instruments` / `target_allocations` / `positions` / `cash_accounts` / `rebalance_plans` / `grid_plans` / `decision_logs` / `trade_records` / `cash_flows` / `review_entries` / `portfolio`
 - 确认 **不存在** `fx_rates`（`20260721_drop_fx_rates.sql`）
 - 确认 **不存在** `index_daily_prices`（`20260718_drop_index_daily_prices.sql`）
