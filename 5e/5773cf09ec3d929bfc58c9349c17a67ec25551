@@ -1,0 +1,41 @@
+.github/workflows/sync-etf-kline.yml
+  s_51bafd3e466c03::t_c59f7cc85250f1 22
+rules/env-secret-output.md
+  s_51bafd3e466c03::t_c3281ffbbb6a03 1-8
+README.md
+  s_51bafd3e466c03::t_cdf88b0d215ac8 92-100
+  s_51bafd3e466c03::t_c59f7cc85250f1 13
+tests/test_etf_yfinance.py
+  s_51bafd3e466c03::t_4fd6bb6f9cedf6 128,133,142-143,152,159
+  s_51bafd3e466c03::t_cdf88b0d215ac8 26
+doc/supabase-schema.md
+  s_51bafd3e466c03::t_cdf88b0d215ac8 435-436
+  s_51bafd3e466c03::t_fee534b2725fb2 47-50
+  s_51bafd3e466c03::t_2bda32c47d3397 51
+  s_51bafd3e466c03::t_1556c467d9f4b8 437-438
+  s_51bafd3e466c03::t_5f6d0e6f0d6781 45,57,77
+doc/supabase-verification.md
+  s_51bafd3e466c03::t_cdf88b0d215ac8 166-170
+  s_51bafd3e466c03::t_c59f7cc85250f1 162
+  s_51bafd3e466c03::t_6f8660497f39c7 163-165
+src/scheduled_tasks/models/migrations/20260928_add_etfs_159915_563360.sql
+  s_51bafd3e466c03::t_c59f7cc85250f1 1-61
+src/scheduled_tasks/jobs/sync_etf_kline_yfinance.py
+  s_51bafd3e466c03::t_c59f7cc85250f1 42
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "5e5773cf09ec3d929bfc58c9349c17a67ec25551",
+  "prompts": {},
+  "sessions": {
+    "s_51bafd3e466c03": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0e6de-a628-7f53-b016-33cbba980e3a",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "AbnerSun <sunyujiejohn@sina.com>"
+    }
+  }
+}
