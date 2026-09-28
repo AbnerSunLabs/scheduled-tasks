@@ -159,7 +159,15 @@ from etf_daily;
 select count(*) as pool_size
 from etf_pool
 where etf_code not in ('512660', '159992');
--- 期望：19（排除历史黑名单后与 EXPECTED_POOL_SIZE 一致）
+-- 期望：20（排除历史黑名单后与 EXPECTED_POOL_SIZE 一致）
+```
+
+```sql
+select etf_code, etf_name, tracking_index_code, tracking_index_name
+from etf_pool
+where etf_code in ('159915', '563360')
+order by etf_code;
+-- 期望：2 行；tracking_index_code 分别为 399006.SZ、000510.SH
 ```
 
 ```sql

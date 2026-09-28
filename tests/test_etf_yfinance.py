@@ -23,6 +23,7 @@ from scheduled_tasks.jobs.sync_etf_kline_yfinance import (
 
 def test_to_yahoo_symbol() -> None:
     assert to_yahoo_symbol("510300") == "510300.SS"
+    assert to_yahoo_symbol("563360") == "563360.SS"
     assert to_yahoo_symbol("159915") == "159915.SZ"
     with pytest.raises(ValueError):
         to_yahoo_symbol("600000")
@@ -124,7 +125,26 @@ def test_parse_codes_arg_ok() -> None:
     assert parse_codes_arg("510300, 159915") == ("510300", "159915")
 
 
-def test_resolve_pool_codes_accepts_expected_19_rows(
+def test_resolve_pool_codes_accepts_expected_20_rows(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    rows = [
+        {"etf_code": f"51{i:04d}", "snapshot_date": date(2026, 7, 31)}
+        for i in range(20)
+    ]
+    monkeypatch.setattr(
+        "scheduled_tasks.jobs.sync_etf_kline_yfinance.fetch_etf_pool",
+        lambda *_a, **_k: rows,
+    )
+
+    codes, meta = resolve_pool_codes(MagicMock(), None)
+
+    assert len(codes) == 20
+    assert meta["pool_size"] == 20
+    assert meta["codes_source"] == "pool"
+
+
+def test_resolve_pool_codes_rejects_unexpected_pool_size(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     rows = [
@@ -136,26 +156,7 @@ def test_resolve_pool_codes_accepts_expected_19_rows(
         lambda *_a, **_k: rows,
     )
 
-    codes, meta = resolve_pool_codes(MagicMock(), None)
-
-    assert len(codes) == 19
-    assert meta["pool_size"] == 19
-    assert meta["codes_source"] == "pool"
-
-
-def test_resolve_pool_codes_rejects_unexpected_pool_size(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    rows = [
-        {"etf_code": f"51{i:04d}", "snapshot_date": date(2026, 7, 31)}
-        for i in range(18)
-    ]
-    monkeypatch.setattr(
-        "scheduled_tasks.jobs.sync_etf_kline_yfinance.fetch_etf_pool",
-        lambda *_a, **_k: rows,
-    )
-
-    with pytest.raises(RuntimeError, match="expected 19 etf codes"):
+    with pytest.raises(RuntimeError, match="expected 20 etf codes"):
         resolve_pool_codes(MagicMock(), None)
 
 

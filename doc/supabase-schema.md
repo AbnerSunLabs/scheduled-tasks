@@ -42,15 +42,19 @@ RLS：
 
 `grid_strategies`：用户命名的网格配置（`config` JSONB）与当次成功结果快照（`result_snapshot` JSONB）；同用户名称按 `lower(btrim(name))` 唯一；本期 `schema_version` 仅允许 `1`。详见 `migrations/20260807_grid_strategies.sql` 与 `stock-charts` 侧 design spec。
 
-## 数据现状（live 快照）
+## 数据现状
 
-> 统计日期：**2026-07-31**（只读查询 live Supabase）。行数会随 job 变化；以当日为准。
+> **2026-09-28 增量验收**：已应用 `20260928_add_etfs_159915_563360.sql`，池规模为 **20**；
+> `159915` 共 3,607 行（2011-09-20 → 2026-09-24），`563360` 共 478 行（2024-10-15 → 2026-09-28），
+> 两者 `close_qfq` / `close_hfq` 均无缺失。`563360` 首次全量数据由红色火箭补缺写入。
+>
+> 以下全库统计日期仍为 **2026-07-31**（只读查询 live Supabase），作为历史完整快照保留。
 
 ### 表行数总览
 
 | 表                       | 行数       | 备注                                                                                        |
 | ------------------------ | ---------- | ------------------------------------------------------------------------------------------- |
-| `etf_pool`               | **19**     | 当前池断言 19 只；全部有 `tracking_index_code`                                              |
+| `etf_pool`               | **19**     | 2026-07-31 当日池 19 只；全部有 `tracking_index_code`                                       |
 | `etf_daily`              | **43 626** | 覆盖池内 19 码；日期 **2011-09-20 → 2026-07-31**                                            |
 | `indices`                | **19**     | 与池跟踪指数一一对应                                                                        |
 | `index_valuation`        | **14**     | 最新估值日为 **2026-07-30**；部分跨境/主题指数无可靠估值                                    |
@@ -70,7 +74,7 @@ RLS：
 
 池内 19 只 ETF 的 `close_qfq` / `close_hfq` **均无缺失**。18 只原池 ETF 最新交易日为 **2026-07-30**；新补的 `513970` 为 **2026-07-31**。
 
-### 当前 `etf_pool`（19）
+### 2026-07-31 `etf_pool` 快照（19）
 
 | etf_code | 名称                           | 分类 | tracking_index_code | aum_yi | snapshot_date |
 | -------- | ------------------------------ | ---- | ------------------- | ------ | ------------- |
@@ -427,6 +431,10 @@ psql "$DATABASE_URL" -f src/scheduled_tasks/models/migrations/20260718_etf_pool_
 
 # 入池恒生消费 ETF 513970 + 恒生消费指数（池断言调整为 19 只）
 psql "$DATABASE_URL" -f src/scheduled_tasks/models/migrations/20260731_add_hang_seng_consumption_etf_513970.sql
+
+# 幂等补齐 159915，入池 563360 + 中证 A500 指数（池断言调整为 20 只）
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 \
+  -f src/scheduled_tasks/models/migrations/20260928_add_etfs_159915_563360.sql
 
 # 清理不在当前池的残留 indices（+ index_valuation；行业权重 CASCADE）
 psql "$DATABASE_URL" -f src/scheduled_tasks/models/migrations/20260718_purge_orphan_indices.sql

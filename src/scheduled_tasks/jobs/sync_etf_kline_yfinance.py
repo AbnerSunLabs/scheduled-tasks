@@ -39,7 +39,7 @@ from scheduled_tasks.etf.yfinance_client import (
 
 JOB_NAME = "sync_etf_kline_yfinance"
 EXCLUDED_CODES = frozenset({"512660", "159992"})
-EXPECTED_POOL_SIZE = 19
+EXPECTED_POOL_SIZE = 20
 ETF_CODE_RE = re.compile(r"^\d{6}$")
 SUMMARY_PATH = Path("artifacts/sync_etf_kline_summary.json")
 DEFAULT_LOOKBACK_DAYS = 5

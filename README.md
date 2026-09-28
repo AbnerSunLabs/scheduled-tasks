@@ -10,7 +10,7 @@ GitHub Actions 定时任务：将 **Yahoo Finance（yfinance）** ETF 日 K、�
 
 ### ETF 日 K
 
-- 从 `etf_pool` 读取当前池（排除黑名单后断言 19 只）。
+- 从 `etf_pool` 读取当前池（排除黑名单后断言 20 只）。
 - 写入 `etf_daily`：不复权 OHLCV + 前/后复权 OHLC + `price_source='yfinance'`；已官网纠偏（`sse`/`szse`）的行不覆盖。
 - 写入 `sync_runs`（`job_name=sync_etf_kline_yfinance`）。
 - 模式：`full` / `incremental` / `adj_check`。
@@ -87,6 +87,15 @@ GitHub Actions：`应用驾驶舱 Migration` 勾选 `apply_drop_fx_rates_migrati
 ```bash
 psql "$DATABASE_URL" -f src/scheduled_tasks/models/migrations/20260715_rename_etf_pool_snapshots_to_etf_pool.sql
 psql "$DATABASE_URL" -f src/scheduled_tasks/models/migrations/20260719_rename_etf_valuation_to_index_valuation.sql
+```
+
+6. **补齐 159915、入池 563360 并回填历史行情**：
+
+```bash
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 \
+  -f src/scheduled_tasks/models/migrations/20260928_add_etfs_159915_563360.sql
+python3 -m scheduled_tasks.jobs.sync_etf_kline_yfinance \
+  --mode=full --codes=159915,563360
 ```
 
 ## 本地运行
