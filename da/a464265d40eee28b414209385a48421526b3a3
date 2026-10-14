@@ -1,0 +1,21 @@
+.github/workflows/sync-etf-kline.yml
+  s_f66995f2303124::t_201fe42e829acc 5-6
+README.md
+  s_f66995f2303124::t_8ac774ff52c968 17
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "daa464265d40eee28b414209385a48421526b3a3",
+  "prompts": {},
+  "sessions": {
+    "s_f66995f2303124": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "07f16db5-a343-4fc7-a328-51ec000379ee",
+        "model": "grok-4.7"
+      },
+      "human_author": "AbnerSun <sunyujiejohn@sina.com>"
+    }
+  }
+}
