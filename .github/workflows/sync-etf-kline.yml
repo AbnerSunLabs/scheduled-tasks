@@ -2,6 +2,8 @@ name: 同步 ETF 日 K 到 Supabase
 
 on:
   schedule:
+    # 工作日北京时间约 09:40 → incremental（补前一交易日收盘；Yahoo 收盘价次日早上才齐）
+    - cron: "40 1 * * 1-5"
     # 工作日北京时间约 18:10 / 18:30 / 19:00 → incremental
     - cron: "10,30 10 * * 1-5"
     - cron: "0 11 * * 1-5"

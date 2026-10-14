@@ -14,7 +14,7 @@ GitHub Actions 定时任务：将 **Yahoo Finance（yfinance）** ETF 日 K、�
 - 写入 `etf_daily`：不复权 OHLCV + 前/后复权 OHLC + `price_source='yfinance'`；已官网纠偏（`sse`/`szse`）的行不覆盖。
 - 写入 `sync_runs`（`job_name=sync_etf_kline_yfinance`）。
 - 模式：`full` / `incremental` / `adj_check`。
-- GHA：`同步 ETF 日 K 到 Supabase`（工作日盘后；定时跑前做交易日闸门，周日 `adj_check`（复权巡检）不加）。
+- GHA：`同步 ETF 日 K 到 Supabase`（工作日北京约 09:40 补前一交易日收盘，以及 18:10 / 18:30 / 19:00；定时跑前做交易日闸门，周日 `adj_check`（复权巡检）不加）。
 
 ### 指数估值（红色火箭）
 
