@@ -1,0 +1,31 @@
+src/scheduled_tasks/jobs/sync_index_levels.py
+  s_0ddf3750cbee5f::t_75cefb196a86b0 87
+  s_0ddf3750cbee5f::t_78588c95c0c517 117,125
+  s_0ddf3750cbee5f::t_be805eb95a05af 136-145,151-160
+  s_0ddf3750cbee5f::t_08c76c29ad1319 44
+  s_0ddf3750cbee5f::t_ccaa7ddc4113b9 1-43,45-86,88-116,118-124,126-135,146-150,161-175
+src/scheduled_tasks/etf/fuyao_index_client.py
+  s_0ddf3750cbee5f::t_685e8775fd4e25 1-83
+tests/test_sync_index_levels.py
+  s_0ddf3750cbee5f::t_4f09c3d5203a2d 5-6,13,15,17-18,24
+  s_0ddf3750cbee5f::t_65ded00bc77c1b 51-52
+  s_0ddf3750cbee5f::t_1e7949da52bc21 1-4,7-12,14,16,19-23,25-50,53-85
+.github/workflows/sync-index-levels.yml
+  s_0ddf3750cbee5f::t_54abbcf5564de6 1-48
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "70c82a8676853b6cc82553e5f05afc6fd47bfafb",
+  "prompts": {},
+  "sessions": {
+    "s_0ddf3750cbee5f": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "bcf02c2d-c154-4555-9470-ae94ff4e3b60",
+        "model": "grok-4.7"
+      },
+      "human_author": "AbnerSun <sunyujiejohn@sina.com>"
+    }
+  }
+}
