@@ -22,6 +22,10 @@ from scheduled_tasks.etf.fuyao_index_client import (
     FUYAO_PRICE_SOURCE,
     fetch_index_daily_closes,
 )
+from scheduled_tasks.etf.sina_forex_client import (
+    PRICE_SOURCE as SINA_PRICE_SOURCE,
+    fetch_usdcnh_daily_closes,
+)
 
 JOB_NAME = "sync_index_levels"
 SUMMARY_PATH = Path("artifacts/sync_index_levels_summary.json")
@@ -39,6 +43,8 @@ INDEX_LEVEL_SPECS: tuple[tuple[str, str, str, str], ...] = (
     ("399975.SZ", "证券公司", "行业", "csindex"),
     ("930955.CSI", "中证红利低波动100", "策略", "csindex"),
     ("399606.SZ", "创业板R", "宽基", FUYAO_PRICE_SOURCE),
+    # indices.code 必须带交易所后缀。离岸没有沪深代码，用已有的 OTH。
+    ("USDCNH.OTH", "美元兑人民币", "汇率", SINA_PRICE_SOURCE),
 )
 
 
@@ -102,6 +108,12 @@ def fetch_closes(
     end: date,
     api_key: str,
 ) -> list[dict[str, Any]]:
+    if source == SINA_PRICE_SOURCE:
+        bars = fetch_usdcnh_daily_closes(start=start, end=end)
+        return [
+            _close_row(index_code, str(bar["trade_date"]), float(bar["close"]), SINA_PRICE_SOURCE)
+            for bar in bars
+        ]
     if source == "csindex":
         bars = fetch_index_daily_bars(index_code, start=start, end=end)
         rows = [

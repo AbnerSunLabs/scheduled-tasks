@@ -8,6 +8,7 @@ from zoneinfo import ZoneInfo
 import pytest
 
 from scheduled_tasks.etf.fuyao_index_client import fetch_index_daily_closes
+from scheduled_tasks.etf.sina_forex_client import parse_usdcnh_kline
 from scheduled_tasks.jobs.sync_index_levels import (
     _without_start_placeholder,
     sync_all_index_levels,
@@ -48,6 +49,14 @@ def test_fuyao_rejects_non_zero_code() -> None:
         )
 
 
+def test_sina_kline_uses_the_close_after_low_and_high() -> None:
+    payload = 'var x=("2026-10-26,6.6692,6.6660,6.6698,6.6676,|2026-10-23,6.6716,6.6677,6.6737,6.6690");'
+    assert parse_usdcnh_kline(payload) == [
+        {"trade_date": "2026-10-23", "close": 6.669},
+        {"trade_date": "2026-10-26", "close": 6.6676},
+    ]
+
+
 def test_drops_close_stamped_on_the_request_start() -> None:
     rows = [
         {"trade_date": "1996-09-14", "close": 1000.0},
@@ -78,8 +87,13 @@ def test_sync_writes_close_only_and_keeps_valuation_null(monkeypatch: pytest.Mon
         assert api_key == "test-key"
         return [{"trade_date": "2026-10-20", "close": 3061.17}]
 
+    def fake_usdcnh(*, start: date, end: date) -> list[dict]:
+        assert end >= start
+        return [{"trade_date": "2026-10-20", "close": 6.6676}]
+
     monkeypatch.setattr("scheduled_tasks.jobs.sync_index_levels.fetch_index_daily_bars", fake_csi)
     monkeypatch.setattr("scheduled_tasks.jobs.sync_index_levels.fetch_index_daily_closes", fake_fuyao)
+    monkeypatch.setattr("scheduled_tasks.jobs.sync_index_levels.fetch_usdcnh_daily_closes", fake_usdcnh)
     monkeypatch.setattr("scheduled_tasks.jobs.sync_index_levels.ensure_index_row", lambda *args, **kwargs: None)
 
     class Conn:
@@ -112,7 +126,8 @@ def test_sync_writes_close_only_and_keeps_valuation_null(monkeypatch: pytest.Mon
         "399975.SZ",
         "930955.CSI",
         "399606.SZ",
+        "USDCNH.OTH",
     ]
-    assert {row["price_source"] for row in written} == {"csindex", "fuyao"}
-    assert sum(row["index_code"] != "399606.SZ" for row in written) == 9
+    assert {row["price_source"] for row in written} == {"csindex", "fuyao", "sina"}
+    assert sum(row["index_code"] not in {"399606.SZ", "USDCNH.OTH"} for row in written) == 9
     assert all(row["pe_ttm"] is None and row["valuation_source"] is None for row in written)
