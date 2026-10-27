@@ -1,4 +1,4 @@
-"""三只指数收盘落库：中证走官方 perf，创业板R 走扶摇 REST。"""
+"""跟踪指数收盘落库：中证样本走官方 perf，创业板R 走扶摇 REST。"""
 
 from __future__ import annotations
 
@@ -8,7 +8,10 @@ from zoneinfo import ZoneInfo
 import pytest
 
 from scheduled_tasks.etf.fuyao_index_client import fetch_index_daily_closes
-from scheduled_tasks.jobs.sync_index_levels import sync_all_index_levels
+from scheduled_tasks.jobs.sync_index_levels import (
+    _without_start_placeholder,
+    sync_all_index_levels,
+)
 
 _SHANGHAI = ZoneInfo("Asia/Shanghai")
 
@@ -43,6 +46,24 @@ def test_fuyao_rejects_non_zero_code() -> None:
             api_key="test-key",
             http_get_json=lambda _url, _headers: {"code": 2001, "message": "bad key"},
         )
+
+
+def test_drops_close_stamped_on_the_request_start() -> None:
+    rows = [
+        {"trade_date": "1996-09-14", "close": 1000.0},
+        {"trade_date": "2004-12-31", "close": 1000.0},
+    ]
+    kept = _without_start_placeholder(rows, date(1996, 9, 14))
+    assert [row["trade_date"] for row in kept] == ["2004-12-31"]
+
+
+def test_keeps_the_real_bar_when_the_window_starts_on_a_trading_day() -> None:
+    rows = [
+        {"trade_date": "2026-10-19", "close": 6800.0},
+        {"trade_date": "2026-10-20", "close": 6814.0},
+    ]
+    kept = _without_start_placeholder(rows, date(2026, 10, 19))
+    assert len(kept) == 2
 
 
 def test_sync_writes_close_only_and_keeps_valuation_null(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -80,6 +101,18 @@ def test_sync_writes_close_only_and_keeps_valuation_null(monkeypatch: pytest.Mon
         api_key="test-key",
     )
     assert summary.status == "success"
-    assert summary.success_codes == ["000905.SH", "930955.CSI", "399606.SZ"]
+    assert summary.success_codes == [
+        "000905.SH",
+        "000922.SH",
+        "399989.SZ",
+        "000990.SH",
+        "000942.SH",
+        "399971.SZ",
+        "000993.SH",
+        "399975.SZ",
+        "930955.CSI",
+        "399606.SZ",
+    ]
     assert {row["price_source"] for row in written} == {"csindex", "fuyao"}
+    assert sum(row["index_code"] != "399606.SZ" for row in written) == 9
     assert all(row["pe_ttm"] is None and row["valuation_source"] is None for row in written)

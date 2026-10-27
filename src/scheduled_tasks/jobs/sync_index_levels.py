@@ -1,4 +1,4 @@
-"""把三只跟踪指数的收盘写入 index_daily_metrics.close。"""
+"""把跟踪指数的收盘写入 index_daily_metrics.close。"""
 
 from __future__ import annotations
 
@@ -27,9 +27,16 @@ JOB_NAME = "sync_index_levels"
 SUMMARY_PATH = Path("artifacts/sync_index_levels_summary.json")
 DEFAULT_LOOKBACK_DAYS = 45
 
-# 中证官方 perf 覆盖前两只；创业板R 不在中证样本，走同花顺扶摇深证指数。
+# 6 位中证样本走官网 perf。创业板R 不在中证样本，走同花顺扶摇深证指数。
 INDEX_LEVEL_SPECS: tuple[tuple[str, str, str, str], ...] = (
     ("000905.SH", "中证500", "宽基", "csindex"),
+    ("000922.SH", "中证红利", "策略", "csindex"),
+    ("399989.SZ", "中证医疗", "行业", "csindex"),
+    ("000990.SH", "全指消费", "行业", "csindex"),
+    ("000942.SH", "内地消费", "行业", "csindex"),
+    ("399971.SZ", "中证传媒", "行业", "csindex"),
+    ("000993.SH", "全指信息", "行业", "csindex"),
+    ("399975.SZ", "证券公司", "行业", "csindex"),
     ("930955.CSI", "中证红利低波动100", "策略", "csindex"),
     ("399606.SZ", "创业板R", "宽基", FUYAO_PRICE_SOURCE),
 )
@@ -62,6 +69,18 @@ def _window(today: date, lookback_days: int) -> tuple[date, date]:
     return today - timedelta(days=lookback_days), today
 
 
+def _without_start_placeholder(rows: list[dict[str, Any]], start: date) -> list[dict[str, Any]]:
+    """起点早于发布日时，官网会把首日收盘贴在请求起点上，这根不能入库。"""
+    if len(rows) < 2:
+        return rows
+    ordered = sorted(rows, key=lambda row: str(row["trade_date"]))
+    first = date.fromisoformat(str(ordered[0]["trade_date"])[:10])
+    second = date.fromisoformat(str(ordered[1]["trade_date"])[:10])
+    if first == start and (second - first).days > 10:
+        return ordered[1:]
+    return ordered
+
+
 def _close_row(index_code: str, trade_date: str, close: float, source: str) -> dict[str, Any]:
     # pe/pb 传 None，让既有估值 coalesce 保留，本任务只更新收盘。
     return {
@@ -92,12 +111,13 @@ def fetch_closes(
         ]
         if not rows:
             raise RuntimeError(f"csindex returned no close for {index_code}")
-        return rows
+        return _without_start_placeholder(rows, start)
     bars = fetch_index_daily_closes(index_code, start=start, end=end, api_key=api_key)
-    return [
+    rows = [
         _close_row(index_code, str(bar["trade_date"]), float(bar["close"]), FUYAO_PRICE_SOURCE)
         for bar in bars
     ]
+    return _without_start_placeholder(rows, start)
 
 
 def sync_all_index_levels(
@@ -119,7 +139,7 @@ def sync_all_index_levels(
             conn.commit()
             summary.success_codes.append(index_code)
             summary.row_counts[index_code] = written
-        except Exception as exc:  # noqa: BLE001 — 单指数失败不阻断其余两只
+        except Exception as exc:  # noqa: BLE001 — 单只失败只回滚这一只
             conn.rollback()
             summary.failure_codes.append(index_code)
             summary.errors.append({"index_code": index_code, "error": str(exc)})
