@@ -1,0 +1,28 @@
+src/scheduled_tasks/etf/sina_forex_client.py
+  s_706e37f6c3825e::t_95cc029bc357d8 1-80
+src/scheduled_tasks/jobs/sync_index_levels.py
+  s_706e37f6c3825e::t_5ad62eae200da9 25-28
+  s_706e37f6c3825e::t_9e9e2780703960 46-47
+  s_706e37f6c3825e::t_a513d440d483fc 111-116
+tests/test_sync_index_levels.py
+  s_706e37f6c3825e::t_c33ff4d3e5c891 11
+  s_706e37f6c3825e::t_c37f3257285751 129,131-132
+  s_706e37f6c3825e::t_be36d4833b44aa 90-93,96
+  s_706e37f6c3825e::t_d3c70e93449729 52-59
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "771ce050bf5cf8a379396529a9b959ca90e7e570",
+  "prompts": {},
+  "sessions": {
+    "s_706e37f6c3825e": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "b05bda65-f841-4137-b056-f9005af09770",
+        "model": "grok-4.7"
+      },
+      "human_author": "AbnerSun <sunyujiejohn@sina.com>"
+    }
+  }
+}
