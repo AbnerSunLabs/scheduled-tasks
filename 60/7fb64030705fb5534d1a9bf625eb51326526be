@@ -1,0 +1,28 @@
+tests/test_sync_index_levels.py
+  s_0ddf3750cbee5f::t_0248c289ffb208 1
+  s_0ddf3750cbee5f::t_f41181251312ce 104-115,117
+  s_0ddf3750cbee5f::t_dd434b0cacfd8c 11-14
+  s_0ddf3750cbee5f::t_eaaa51e7197c5e 51-68
+src/scheduled_tasks/jobs/sync_index_levels.py
+  s_0ddf3750cbee5f::t_cf23ae77585691 114,116,120
+  s_0ddf3750cbee5f::t_f9dd8f33cf5f43 142
+  s_0ddf3750cbee5f::t_5ead26ef472349 72-83
+  s_0ddf3750cbee5f::t_b931c8c5dd874c 30,33-39
+  s_0ddf3750cbee5f::t_54e777c252a160 1
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "607fb64030705fb5534d1a9bf625eb51326526be",
+  "prompts": {},
+  "sessions": {
+    "s_0ddf3750cbee5f": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "bcf02c2d-c154-4555-9470-ae94ff4e3b60",
+        "model": "grok-4.7"
+      },
+      "human_author": "AbnerSun <sunyujiejohn@sina.com>"
+    }
+  }
+}
