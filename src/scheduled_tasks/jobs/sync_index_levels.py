@@ -43,6 +43,7 @@ INDEX_LEVEL_SPECS: tuple[tuple[str, str, str, str], ...] = (
     ("000991.SH", "全指医药", "行业", "csindex"),
     ("000990.SH", "全指消费", "行业", "csindex"),
     ("000942.SH", "内地消费", "行业", "csindex"),
+    ("000815.SH", "中证细分食品饮料", "行业", "csindex"),
     ("399971.SZ", "中证传媒", "行业", "csindex"),
     ("000993.SH", "全指信息", "行业", "csindex"),
     ("399975.SZ", "证券公司", "行业", "csindex"),
