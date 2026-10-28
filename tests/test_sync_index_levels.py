@@ -140,6 +140,7 @@ def test_sync_writes_close_only_and_keeps_valuation_null(monkeypatch: pytest.Mon
         "000991.SH",
         "000990.SH",
         "000942.SH",
+        "000815.SH",
         "399971.SZ",
         "000993.SH",
         "399975.SZ",
@@ -149,5 +150,5 @@ def test_sync_writes_close_only_and_keeps_valuation_null(monkeypatch: pytest.Mon
         "USDCNH.OTH",
     ]
     assert {row["price_source"] for row in written} == {"csindex", "fuyao", "sina", "eastmoney"}
-    assert sum(row["index_code"] not in {"399606.SZ", "USDCNH.OTH", "HSI.HI"} for row in written) == 10
+    assert sum(row["index_code"] not in {"399606.SZ", "USDCNH.OTH", "HSI.HI"} for row in written) == 11
     assert all(row["pe_ttm"] is None and row["valuation_source"] is None for row in written)
