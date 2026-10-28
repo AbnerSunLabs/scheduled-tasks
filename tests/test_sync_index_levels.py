@@ -8,6 +8,7 @@ from zoneinfo import ZoneInfo
 import pytest
 
 from scheduled_tasks.etf.fuyao_index_client import fetch_index_daily_closes
+from scheduled_tasks.etf.eastmoney_hsi_client import drop_unclosed_session, parse_hsi_klines
 from scheduled_tasks.etf.sina_forex_client import parse_usdcnh_kline
 from scheduled_tasks.jobs.sync_index_levels import (
     _without_start_placeholder,
@@ -57,6 +58,18 @@ def test_sina_kline_uses_the_close_after_low_and_high() -> None:
     ]
 
 
+def test_hsi_kline_uses_the_close_and_drops_the_open_session() -> None:
+    rows = parse_hsi_klines(
+        {"data": {"klines": ["2026-10-27,23041.32", "2026-10-28,23066.52"]}}
+    )
+    assert rows == [
+        {"trade_date": date(2026, 10, 27), "close": 23041.32},
+        {"trade_date": date(2026, 10, 28), "close": 23066.52},
+    ]
+    morning = datetime(2026, 10, 28, 9, 45, tzinfo=ZoneInfo("Asia/Hong_Kong"))
+    assert drop_unclosed_session(rows, now=morning) == rows[:1]
+
+
 def test_drops_close_stamped_on_the_request_start() -> None:
     rows = [
         {"trade_date": "1996-09-14", "close": 1000.0},
@@ -91,9 +104,14 @@ def test_sync_writes_close_only_and_keeps_valuation_null(monkeypatch: pytest.Mon
         assert end >= start
         return [{"trade_date": "2026-10-20", "close": 6.6676}]
 
+    def fake_hsi(*, start: date, end: date) -> list[dict]:
+        assert end >= start
+        return [{"trade_date": date(2026, 10, 20), "close": 23041.32}]
+
     monkeypatch.setattr("scheduled_tasks.jobs.sync_index_levels.fetch_index_daily_bars", fake_csi)
     monkeypatch.setattr("scheduled_tasks.jobs.sync_index_levels.fetch_index_daily_closes", fake_fuyao)
     monkeypatch.setattr("scheduled_tasks.jobs.sync_index_levels.fetch_usdcnh_daily_closes", fake_usdcnh)
+    monkeypatch.setattr("scheduled_tasks.jobs.sync_index_levels.fetch_hsi_daily_closes", fake_hsi)
     monkeypatch.setattr("scheduled_tasks.jobs.sync_index_levels.ensure_index_row", lambda *args, **kwargs: None)
 
     class Conn:
@@ -127,8 +145,9 @@ def test_sync_writes_close_only_and_keeps_valuation_null(monkeypatch: pytest.Mon
         "399975.SZ",
         "930955.CSI",
         "399606.SZ",
+        "HSI.HI",
         "USDCNH.OTH",
     ]
-    assert {row["price_source"] for row in written} == {"csindex", "fuyao", "sina"}
-    assert sum(row["index_code"] not in {"399606.SZ", "USDCNH.OTH"} for row in written) == 10
+    assert {row["price_source"] for row in written} == {"csindex", "fuyao", "sina", "eastmoney"}
+    assert sum(row["index_code"] not in {"399606.SZ", "USDCNH.OTH", "HSI.HI"} for row in written) == 10
     assert all(row["pe_ttm"] is None and row["valuation_source"] is None for row in written)

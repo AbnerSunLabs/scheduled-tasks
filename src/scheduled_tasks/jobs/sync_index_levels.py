@@ -18,6 +18,10 @@ from scheduled_tasks.db import (
     upsert_index_daily_metrics,
 )
 from scheduled_tasks.etf.csindex_client import fetch_index_daily_bars
+from scheduled_tasks.etf.eastmoney_hsi_client import (
+    PRICE_SOURCE as EASTMONEY_PRICE_SOURCE,
+    fetch_hsi_daily_closes,
+)
 from scheduled_tasks.etf.fuyao_index_client import (
     FUYAO_PRICE_SOURCE,
     fetch_index_daily_closes,
@@ -44,6 +48,8 @@ INDEX_LEVEL_SPECS: tuple[tuple[str, str, str, str], ...] = (
     ("399975.SZ", "证券公司", "行业", "csindex"),
     ("930955.CSI", "中证红利低波动100", "策略", "csindex"),
     ("399606.SZ", "创业板R", "宽基", FUYAO_PRICE_SOURCE),
+    # 恒生不在中证样本。代码用指数表里已有的 HSI.HI。
+    ("HSI.HI", "恒生指数", "宽基", EASTMONEY_PRICE_SOURCE),
     # indices.code 必须带交易所后缀。离岸没有沪深代码，用已有的 OTH。
     ("USDCNH.OTH", "美元兑人民币", "汇率", SINA_PRICE_SOURCE),
 )
@@ -109,6 +115,12 @@ def fetch_closes(
     end: date,
     api_key: str,
 ) -> list[dict[str, Any]]:
+    if source == EASTMONEY_PRICE_SOURCE:
+        bars = fetch_hsi_daily_closes(start=start, end=end)
+        return [
+            _close_row(index_code, str(bar["trade_date"]), float(bar["close"]), EASTMONEY_PRICE_SOURCE)
+            for bar in bars
+        ]
     if source == SINA_PRICE_SOURCE:
         bars = fetch_usdcnh_daily_closes(start=start, end=end)
         return [
