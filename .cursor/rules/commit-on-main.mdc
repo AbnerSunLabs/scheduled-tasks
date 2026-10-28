@@ -1,0 +1,19 @@
+---
+description: scheduled-tasks 的提交直接落在 main 并推送
+alwaysApply: true
+---
+
+# 提交直接进入 main
+
+本仓库的代码提交**不要**留在功能分支上。
+
+## 必须
+
+1. 在 `main` 上提交。若当前不在 `main`，先把未完成、且不属于这次提交的改动挪开，再切到 `main`。
+2. 提交完成后立刻 `git push origin main`。
+3. 推送用现有的 HTTPS 远端。失败时先看 `gh auth status`，再重试 `git push`，不要改 git 配置，也不要改走 SSH。
+
+## 不要带上
+
+- 与当次任务无关的工作区改动（编制规则、`.env.example` 等未完成文件）
+- `git push --force`
