@@ -1,0 +1,19 @@
+.cursor/rules/commit-on-main.mdc
+  s_706e37f6c3825e::t_4268ec3b5ab854 1-19
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "44a6fb10fecda679ada18d0ab93059fd48af9148",
+  "prompts": {},
+  "sessions": {
+    "s_706e37f6c3825e": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "b05bda65-f841-4137-b056-f9005af09770",
+        "model": "grok-4.7"
+      },
+      "human_author": "AbnerSun <sunyujiejohn@sina.com>"
+    }
+  }
+}
