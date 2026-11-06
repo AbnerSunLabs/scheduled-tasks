@@ -1,0 +1,22 @@
+.cursor/rules/commit-on-main.mdc
+  s_e724e11b93e1e4::t_db0320a51070ba 13
+.github/workflows/sync-index-levels.yml
+  s_e724e11b93e1e4::t_dbd9251b900645 29-30,33-35
+  s_e724e11b93e1e4::t_e72e5d22d6c4c5 36
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "a8631b956e4a8891351d4a46ab26e0575a3d84c3",
+  "prompts": {},
+  "sessions": {
+    "s_e724e11b93e1e4": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "5cf5c8f2-2818-47ae-8b4f-43ca5eee857d",
+        "model": "grok-4.7"
+      },
+      "human_author": "AbnerSun <sunyujiejohn@sina.com>"
+    }
+  }
+}
