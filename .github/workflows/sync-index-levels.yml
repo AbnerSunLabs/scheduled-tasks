@@ -26,9 +26,13 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           FUYAO_API_KEY: ${{ secrets.FUYAO_API_KEY }}
         run: |
-          if [ -z "$DATABASE_URL" ] || [ -z "$FUYAO_API_KEY" ]; then
-            echo "::error::Missing GitHub Secret: DATABASE_URL or FUYAO_API_KEY"
+          if [ -z "$DATABASE_URL" ]; then
+            echo "::error::Missing GitHub Secret: DATABASE_URL"
             exit 1
+          fi
+          # 扶摇只拉创业板R。缺 Key 时任务内跳过这一只，不能挡住其余指数。
+          if [ -z "$FUYAO_API_KEY" ]; then
+            echo "::warning::FUYAO_API_KEY is empty; 399606.SZ will be skipped"
           fi
 
       - name: Install dependencies
