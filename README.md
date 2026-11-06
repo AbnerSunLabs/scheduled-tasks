@@ -31,6 +31,15 @@ GitHub Actions 定时任务：将 **Yahoo Finance（yfinance）** ETF 日 K、�
 - 默认标的：`512170`（医疗 ETF）+ `399989.SZ`（中证医疗）。
 - ETF 补缺、行业权重刷新见 [doc/hongsehuojian-fill-validate.md](doc/hongsehuojian-fill-validate.md)。
 
+### 指数收盘
+
+- 中证官网 `index-perf`：中证500 `000905.SH`、中证红利 `000922.SH`、中证医疗 `399989.SZ`、全指消费 `000990.SH`、内地消费 `000942.SH`、中证传媒 `399971.SZ`、全指信息 `000993.SH`、证券公司 `399975.SZ`、中证红利低波动100 `930955.CSI`。
+- 同花顺扶摇 `GET /api/a-share-index/prices/historical`：创业板R `399606.SZ`。中证接口对它返回空。
+- 新浪离岸日线 `fx_susdcnh`：美元兑人民币 `USDCNH.OTH`，收盘按 1 美元计。`indices.code` 用已有的 `OTH` 后缀。
+- 只写 `index_daily_metrics.close` 与 `price_source`（`csindex` / `fuyao` / `sina`）；PE/PB 传空，不覆盖红色火箭已有估值。
+- 入口：`python -m scheduled_tasks.jobs.sync_index_levels`。`FUYAO_API_KEY` 只给创业板R；没配时这一只失败，其余指数照常写入。
+- GHA：`Sync index levels`（工作日北京约 19:30；定时跑前做交易日闸门）。缺 `FUYAO_API_KEY` 不阻断这次任务。
+
 ### 官网双源校验
 
 - 上交所（ETF）+ 中证（指数）vs 库；默认只比对告警，`--apply-official --yes` 才纠偏；纠偏后主写不覆盖不复权 OHLC，`adj_check` 仍可刷复权列。
@@ -52,6 +61,7 @@ Repository Secrets:
 
 - `DATABASE_URL`：Supabase PostgreSQL 连接串
 - `BARK_KEY`：Bark 推送 key（未配置时跳过通知，不阻断主任务）
+- `FUYAO_API_KEY`：同花顺扶摇 REST `X-api-key`（只拉创业板R；未配置时跳过这一只，不阻断 `sync_index_levels`）
 
 Do not print secret values in logs, documents, issue comments, or chat.
 

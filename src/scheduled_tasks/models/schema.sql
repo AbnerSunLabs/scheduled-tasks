@@ -28,7 +28,7 @@ create index if not exists idx_index_industry_weights_as_of_date
   on index_industry_weights (as_of_date desc);
 
 -- 指数日指标（收盘点位 / PE TTM / PB）；与已删的 index_daily_prices 不同，同一主键可合入点位与估值。
--- 主写：sync_hongsehuojian_fill_validate（字段级 coalesce upsert）。
+-- 主写：sync_hongsehuojian_fill_validate 写估值；sync_index_levels 写跟踪指数收盘。字段级 coalesce upsert。
 create table if not exists index_daily_metrics (
   index_code text not null references indices(code) on delete cascade,
   trade_date date not null,

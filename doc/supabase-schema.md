@@ -24,17 +24,17 @@ RLS：
 
 ## 概览
 
-| 类型 | 名称                     | 说明                                                 | 本方案状态                        |
-| ---- | ------------------------ | ---------------------------------------------------- | --------------------------------- |
-| 表   | `indices`                | 指数元数据（Live 另有估值可用性状态列）              | 红色火箭可 ensure 单行            |
-| 表   | `index_daily_metrics`    | 指数日指标（收盘点位 / PE TTM / PB）                 | **红色火箭主写**（schema 已收录） |
-| 表   | `index_industry_weights` | 指数行业权重（申万分级）                             | **红色火箭主写**                  |
-| 表   | `sync_runs`              | 同步任务执行记录（含 `meta`）                        | **写入**                          |
-| 表   | `etf_pool`               | ETF 当前池（PK=`etf_code`，非历史快照）              | **只读**                          |
-| 表   | `etf_daily`              | ETF 日行情（OHLC + volume + 前/后复权 + 来源）       | **主写**                          |
-| 表   | `index_valuation`        | 跟踪指数估值快照（当日/5y/10y PE）                   | **红色火箭可写**                  |
-| 视图 | `index_latest_snapshot`  | 指数最新快照（价列仍恒 null + `index_valuation` PE） | 可读                              |
-| 视图 | `index_detail_snapshot`  | 指数各维度最新日期（`latest_price_date` 仍恒 null）  | 可读                              |
+| 类型 | 名称                     | 说明                                                 | 本方案状态                                         |
+| ---- | ------------------------ | ---------------------------------------------------- | -------------------------------------------------- |
+| 表   | `indices`                | 指数元数据（Live 另有估值可用性状态列）              | 红色火箭可 ensure 单行                             |
+| 表   | `index_daily_metrics`    | 指数日指标（收盘点位 / PE TTM / PB）                 | 红色火箭写估值；`sync_index_levels` 写跟踪指数收盘 |
+| 表   | `index_industry_weights` | 指数行业权重（申万分级）                             | **红色火箭主写**                                   |
+| 表   | `sync_runs`              | 同步任务执行记录（含 `meta`）                        | **写入**                                           |
+| 表   | `etf_pool`               | ETF 当前池（PK=`etf_code`，非历史快照）              | **只读**                                           |
+| 表   | `etf_daily`              | ETF 日行情（OHLC + volume + 前/后复权 + 来源）       | **主写**                                           |
+| 表   | `index_valuation`        | 跟踪指数估值快照（当日/5y/10y PE）                   | **红色火箭可写**                                   |
+| 视图 | `index_latest_snapshot`  | 指数最新快照（价列仍恒 null + `index_valuation` PE） | 可读                                               |
+| 视图 | `index_detail_snapshot`  | 指数各维度最新日期（`latest_price_date` 仍恒 null）  | 可读                                               |
 
 驾驶舱账本 12 表（`portfolio_settings` 等）**已删除**，见 `20260820_drop_cockpit_ledger.sql`。
 
@@ -94,19 +94,19 @@ RLS：
 | 513180   | 华夏恒生科技 ETF               | 跨境 | HSTECH.HI           | 150    | 2026-07-16    |
 | 513500   | 博时标普 500ETF                | 跨境 | SPX.OTH             | 180    | 2026-07-16    |
 | 513970   | 景顺长城恒生消费 ETF（QDII）   | 跨境 | HSCGSI.HI           | —      | 2026-07-31    |
-| 515170   | 食品饮料 ETF                   | 行业 | 399396.SZ           | 120    | 2026-05-22    |
+| 515170   | 食品饮料 ETF                   | 行业 | 000815.SH           | 120    | 2026-05-22    |
 | 562500   | 华夏中证机器人 ETF             | 行业 | H30590.CSI          | 55     | 2026-07-16    |
 | 588000   | 科创 50ETF                     | 宽基 | 000688.SH           | 918    | 2026-05-22    |
 
 ### 指数覆盖矩阵
 
-| 指数 code                                                                                                              | `index_valuation` | `index_industry_weights` | `index_daily_metrics` |
-| ---------------------------------------------------------------------------------------------------------------------- | ----------------- | ------------------------ | --------------------- |
-| 000300.SH                                                                                                              | ✓                 | ✓                        | ✓（全库仅此码）       |
-| 000688.SH / 000905.SH / 399006.SZ / 000991.SH / 000993.SH / 399396.SZ / 399971.SZ / 399975.SZ / 399989.SZ / 930955.CSI | ✓                 | ✓                        | —                     |
-| 000932.SH                                                                                                              | ✓                 | —                        | —                     |
-| HSI.HI / HSTECH.HI                                                                                                     | ✓                 | —                        | —                     |
-| H30533.CSI / H30590.CSI / HSCGSI.HI / NDX.NASDAQ / SPX.OTH                                                           | —                 | —                        | —                     |
+| 指数 code                                                                                                  | `index_valuation` | `index_industry_weights` | `index_daily_metrics` |
+| ---------------------------------------------------------------------------------------------------------- | ----------------- | ------------------------ | --------------------- |
+| 000300.SH                                                                                                  | ✓                 | ✓                        | ✓（全库仅此码）       |
+| 000688.SH / 000905.SH / 399006.SZ / 000991.SH / 000993.SH / 399971.SZ / 399975.SZ / 399989.SZ / 930955.CSI | ✓                 | ✓                        | —                     |
+| 000932.SH                                                                                                  | ✓                 | —                        | —                     |
+| HSI.HI / HSTECH.HI                                                                                         | ✓                 | —                        | —                     |
+| H30533.CSI / H30590.CSI / HSCGSI.HI / NDX.NASDAQ / SPX.OTH                                                 | —                 | —                        | —                     |
 
 - `indices.valuation_status`：当前 **19 行均为 `unknown`**（`valuation_source` / `valuation_checked_at` 为空）。
 - `index_daily_metrics` 来源：`price_source='hongsehuojian'`；其中 3 023 行同时有 `valuation_source='hongsehuojian'`，其余 2 937 行仅有收盘点位。
@@ -195,7 +195,7 @@ erDiagram
 
 ### `index_daily_metrics` — 指数日指标
 
-> DDL 见 `schema.sql` 与 `migrations/20260721_add_index_daily_metrics.sql`。表注释：指数日指标（收盘点位、PE TTM、PB）。与已删除的 `index_daily_prices` 不同：同一主键下可同时存点位与估值字段。主写：`sync_hongsehuojian_fill_validate`。
+> DDL 见 `schema.sql` 与 `migrations/20260721_add_index_daily_metrics.sql`。表注释：指数日指标（收盘点位、PE TTM、PB）。与已删除的 `index_daily_prices` 不同：同一主键下可同时存点位与估值字段。估值主写：`sync_hongsehuojian_fill_validate`。收盘另由 `sync_index_levels` 写入跟踪指数（只更新 `close` / `price_source`）：`000905.SH`、`000922.SH`、`399989.SZ`、`000990.SH`、`000942.SH`、`399971.SZ`、`000993.SH`、`399975.SZ`、`930955.CSI`、`399606.SZ`。
 
 | 列名               | 类型          | 约束                                | 说明                                              |
 | ------------------ | ------------- | ----------------------------------- | ------------------------------------------------- |
@@ -303,16 +303,16 @@ erDiagram
 
 ### `etf_daily` — ETF 日行情
 
-| 列名                                                                              | 类型                | 约束                      | 说明                                                                                                                                                                                                           |
-| --------------------------------------------------------------------------------- | ------------------- | ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `etf_code`                                                                        | `text`              | **PK**                    | ETF 代码                                                                                                                                                                                                       |
-| `trade_date`                                                                      | `date`              | **PK**                    | 交易日                                                                                                                                                                                                         |
-| `open/high/low/close`                                                             | `numeric`           | close NOT NULL            | **不复权** OHLC                                                                                                                                                                                                |
-| `volume`                                                                          | `numeric`           | 可空                      | 成交量（**手**）                                                                                                                                                                                               |
-| `open_qfq` / `high_qfq` / `low_qfq` / `close_qfq`                                 | `numeric(18,4)`     | 可空                      | 前复权 OHLC                                                                                                                                                                                                    |
-| `open_hfq` / `high_hfq` / `low_hfq` / `close_hfq`                                 | `numeric(18,4)`     | 可空                      | 后复权 OHLC                                                                                                                                                                                                    |
-| `price_source`                                                                    | `text`              | 可空                      | 不复权 OHLC/volume 来源：`yfinance`（主写）/ `hongsehuojian`（红色火箭补缺 INSERT）/ `sse`（上交所官网纠偏）/ `adj_gap_fill`（历史缺复权回填）；`sse`/`szse` 时主写 UPSERT 不覆盖该行 OHLC；`adj_check` 仍可刷复权列、不改本列 |
-| `updated_at`                                                                      | `timestamptz`       | NOT NULL, DEFAULT `now()` | **价格侧**新鲜度                                                                                                                                                                                               |
+| 列名                                              | 类型            | 约束                      | 说明                                                                                                                                                                                                                           |
+| ------------------------------------------------- | --------------- | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `etf_code`                                        | `text`          | **PK**                    | ETF 代码                                                                                                                                                                                                                       |
+| `trade_date`                                      | `date`          | **PK**                    | 交易日                                                                                                                                                                                                                         |
+| `open/high/low/close`                             | `numeric`       | close NOT NULL            | **不复权** OHLC                                                                                                                                                                                                                |
+| `volume`                                          | `numeric`       | 可空                      | 成交量（**手**）                                                                                                                                                                                                               |
+| `open_qfq` / `high_qfq` / `low_qfq` / `close_qfq` | `numeric(18,4)` | 可空                      | 前复权 OHLC                                                                                                                                                                                                                    |
+| `open_hfq` / `high_hfq` / `low_hfq` / `close_hfq` | `numeric(18,4)` | 可空                      | 后复权 OHLC                                                                                                                                                                                                                    |
+| `price_source`                                    | `text`          | 可空                      | 不复权 OHLC/volume 来源：`yfinance`（主写）/ `hongsehuojian`（红色火箭补缺 INSERT）/ `sse`（上交所官网纠偏）/ `adj_gap_fill`（历史缺复权回填）；`sse`/`szse` 时主写 UPSERT 不覆盖该行 OHLC；`adj_check` 仍可刷复权列、不改本列 |
+| `updated_at`                                      | `timestamptz`   | NOT NULL, DEFAULT `now()` | **价格侧**新鲜度                                                                                                                                                                                                               |
 
 > 已删除闲置列（job 从不写）：`nav` / `premium_rate` / `fund_size` / `listing_days` / `bid_price` / `ask_price`（`20260722_drop_etf_daily_idle_columns.sql`）。成交额列删除见 `20260717_drop_etf_daily_amount_columns.sql`。
 

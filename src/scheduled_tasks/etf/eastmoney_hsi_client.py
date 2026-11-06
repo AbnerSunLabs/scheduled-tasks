@@ -1,9 +1,11 @@
-"""东方财富恒生指数日线。
+"""东方财富指数日线。
 
 接口（非公开 SLA，可能改版）：
 ``GET https://push2his.eastmoney.com/api/qt/stock/kline/get?secid=100.HSI&klt=101``
 
-``f51`` 是日期，``f53`` 是收盘。港股 16:00 收盘，当天 16:00 前不把最后一根当收盘。
+``f51`` 是日期，``f53`` 是收盘。恒生、恒生医疗、创业板指、标普 500 分别用
+``100.HSI``、``124.HSHCI``、``0.399006``、``100.SPX``。
+港股 16:00（香港）、A 股 15:00（上海）、标普现金盘 16:00（美东）之前，不把当天最后一根当收盘。
 """
 
 from __future__ import annotations
@@ -20,11 +22,19 @@ from zoneinfo import ZoneInfo
 import certifi
 
 PRICE_SOURCE = "eastmoney"
-SECID = "100.HSI"
 DEFAULT_URL = "https://push2his.eastmoney.com/api/qt/stock/kline/get"
 HK = ZoneInfo("Asia/Hong_Kong")
+NY = ZoneInfo("America/New_York")
+SH = ZoneInfo("Asia/Shanghai")
 CLOSE_HOUR = 16
 USER_AGENT = "scheduled-tasks-eastmoney-hsi/1.0"
+# secid、收盘时区、收盘钟点。创业板指不在中证官网样本里；标普按美东收盘，不沿用港股。
+INDEX_SESSIONS: dict[str, tuple[str, ZoneInfo, int]] = {
+    "HSI.HI": ("100.HSI", HK, CLOSE_HOUR),
+    "HSHCI.HI": ("124.HSHCI", HK, CLOSE_HOUR),
+    "399006.SZ": ("0.399006", SH, 15),
+    "SPX.OTH": ("100.SPX", NY, CLOSE_HOUR),
+}
 
 
 def _ssl_context() -> ssl.SSLContext:
@@ -54,29 +64,25 @@ def parse_hsi_klines(payload: dict[str, Any]) -> list[dict[str, Any]]:
     return rows
 
 
-def drop_unclosed_session(rows: list[dict[str, Any]], *, now: datetime) -> list[dict[str, Any]]:
-    """港股当天 16:00 前，最后一根还是盘中价。"""
-    local = now.astimezone(HK)
-    session_close = local.replace(hour=CLOSE_HOUR, minute=0, second=0, microsecond=0)
+def drop_unclosed_session(
+    rows: list[dict[str, Any]],
+    *,
+    now: datetime,
+    zone: ZoneInfo = HK,
+    close_hour: int = CLOSE_HOUR,
+) -> list[dict[str, Any]]:
+    """收盘时刻前，最后一根还是盘中价。时区按该指数的交易时段。"""
+    local = now.astimezone(zone)
+    session_close = local.replace(hour=close_hour, minute=0, second=0, microsecond=0)
     if local >= session_close:
         return rows
-    today = session_close.date()
-    return [row for row in rows if row["trade_date"] < today]
+    return [row for row in rows if row["trade_date"] < local.date()]
 
 
-def fetch_hsi_daily_closes(
-    *,
-    start: date,
-    end: date,
-    now: datetime | None = None,
-    http_get_json: Callable[[str], dict[str, Any]] | None = None,
-) -> list[dict[str, Any]]:
-    """拉取恒生收盘，再按请求窗口和港股收盘时刻过滤。"""
-    if end < start:
-        return []
+def _kline_url(secid: str) -> str:
     query = urllib.parse.urlencode(
         {
-            "secid": SECID,
+            "secid": secid,
             "klt": "101",
             "fqt": "1",
             "beg": "19900101",
@@ -86,10 +92,41 @@ def fetch_hsi_daily_closes(
             "fields2": "f51,f53",
         }
     )
+    return f"{DEFAULT_URL}?{query}"
+
+
+def fetch_eastmoney_index_closes(
+    index_code: str,
+    *,
+    start: date,
+    end: date,
+    now: datetime | None = None,
+    http_get_json: Callable[[str], dict[str, Any]] | None = None,
+) -> list[dict[str, Any]]:
+    """按指数代码拉取收盘，并丢掉尚未收盘的当天。"""
+    session = INDEX_SESSIONS.get(index_code)
+    if session is None:
+        raise RuntimeError(f"no eastmoney session for {index_code}")
+    if end < start:
+        return []
+    secid, zone, hour = session
     getter = http_get_json or _http_get_json
-    rows = parse_hsi_klines(getter(f"{DEFAULT_URL}?{query}"))
+    rows = parse_hsi_klines(getter(_kline_url(secid)))
     rows = [row for row in rows if start <= row["trade_date"] <= end]
-    rows = drop_unclosed_session(rows, now=now or datetime.now(HK))
+    rows = drop_unclosed_session(rows, now=now or datetime.now(zone), zone=zone, close_hour=hour)
     if not rows:
-        raise RuntimeError("eastmoney returned no HSI close in the requested window")
+        raise RuntimeError(f"eastmoney returned no close for {index_code}")
     return rows
+
+
+def fetch_hsi_daily_closes(
+    *,
+    start: date,
+    end: date,
+    now: datetime | None = None,
+    http_get_json: Callable[[str], dict[str, Any]] | None = None,
+) -> list[dict[str, Any]]:
+    """拉取恒生收盘。其它东财指数走 ``fetch_eastmoney_index_closes``。"""
+    return fetch_eastmoney_index_closes(
+        "HSI.HI", start=start, end=end, now=now, http_get_json=http_get_json
+    )

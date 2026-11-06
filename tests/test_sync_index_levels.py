@@ -8,7 +8,11 @@ from zoneinfo import ZoneInfo
 import pytest
 
 from scheduled_tasks.etf.fuyao_index_client import fetch_index_daily_closes
-from scheduled_tasks.etf.eastmoney_hsi_client import drop_unclosed_session, parse_hsi_klines
+from scheduled_tasks.etf.eastmoney_hsi_client import (
+    drop_unclosed_session,
+    fetch_eastmoney_index_closes,
+    parse_hsi_klines,
+)
 from scheduled_tasks.etf.sina_forex_client import parse_usdcnh_kline
 from scheduled_tasks.jobs.sync_index_levels import (
     _without_start_placeholder,
@@ -68,6 +72,42 @@ def test_hsi_kline_uses_the_close_and_drops_the_open_session() -> None:
     ]
     morning = datetime(2026, 10, 28, 9, 45, tzinfo=ZoneInfo("Asia/Hong_Kong"))
     assert drop_unclosed_session(rows, now=morning) == rows[:1]
+    us_morning = datetime(2026, 10, 28, 10, 0, tzinfo=ZoneInfo("America/New_York"))
+    assert drop_unclosed_session(rows, now=us_morning, zone=ZoneInfo("America/New_York")) == rows[:1]
+
+
+def test_eastmoney_secid_follows_the_index_code() -> None:
+    seen: list[str] = []
+
+    def fake_get(url: str) -> dict:
+        seen.append(url)
+        return {"data": {"klines": ["2026-10-27,3404.03"]}}
+
+    closed = datetime(2026, 10, 28, 18, tzinfo=ZoneInfo("Asia/Hong_Kong"))
+    fetch_eastmoney_index_closes(
+        "HSHCI.HI",
+        start=date(2026, 10, 27),
+        end=date(2026, 10, 27),
+        now=closed,
+        http_get_json=fake_get,
+    )
+    fetch_eastmoney_index_closes(
+        "SPX.OTH",
+        start=date(2026, 10, 27),
+        end=date(2026, 10, 27),
+        now=closed,
+        http_get_json=fake_get,
+    )
+    assert "secid=124.HSHCI" in seen[0]
+    assert "secid=100.SPX" in seen[1]
+    fetch_eastmoney_index_closes(
+        "399006.SZ",
+        start=date(2026, 10, 27),
+        end=date(2026, 10, 27),
+        now=closed,
+        http_get_json=fake_get,
+    )
+    assert "secid=0.399006" in seen[2]
 
 
 def test_drops_close_stamped_on_the_request_start() -> None:
@@ -104,14 +144,18 @@ def test_sync_writes_close_only_and_keeps_valuation_null(monkeypatch: pytest.Mon
         assert end >= start
         return [{"trade_date": "2026-10-20", "close": 6.6676}]
 
-    def fake_hsi(*, start: date, end: date) -> list[dict]:
+    def fake_eastmoney(index_code: str, *, start: date, end: date) -> list[dict]:
         assert end >= start
+        assert index_code in {"HSI.HI", "HSHCI.HI", "SPX.OTH", "399006.SZ"}
         return [{"trade_date": date(2026, 10, 20), "close": 23041.32}]
 
     monkeypatch.setattr("scheduled_tasks.jobs.sync_index_levels.fetch_index_daily_bars", fake_csi)
     monkeypatch.setattr("scheduled_tasks.jobs.sync_index_levels.fetch_index_daily_closes", fake_fuyao)
     monkeypatch.setattr("scheduled_tasks.jobs.sync_index_levels.fetch_usdcnh_daily_closes", fake_usdcnh)
-    monkeypatch.setattr("scheduled_tasks.jobs.sync_index_levels.fetch_hsi_daily_closes", fake_hsi)
+    monkeypatch.setattr(
+        "scheduled_tasks.jobs.sync_index_levels.fetch_eastmoney_index_closes",
+        fake_eastmoney,
+    )
     monkeypatch.setattr("scheduled_tasks.jobs.sync_index_levels.ensure_index_row", lambda *args, **kwargs: None)
 
     class Conn:
@@ -147,8 +191,14 @@ def test_sync_writes_close_only_and_keeps_valuation_null(monkeypatch: pytest.Mon
         "930955.CSI",
         "399606.SZ",
         "HSI.HI",
+        "399006.SZ",
+        "HSHCI.HI",
+        "000300.SH",
+        "000852.SH",
+        "SPX.OTH",
         "USDCNH.OTH",
     ]
     assert {row["price_source"] for row in written} == {"csindex", "fuyao", "sina", "eastmoney"}
-    assert sum(row["index_code"] not in {"399606.SZ", "USDCNH.OTH", "HSI.HI"} for row in written) == 11
+    outside_csindex = {"399606.SZ", "USDCNH.OTH", "HSI.HI", "HSHCI.HI", "SPX.OTH", "399006.SZ"}
+    assert sum(row["index_code"] not in outside_csindex for row in written) == 13
     assert all(row["pe_ttm"] is None and row["valuation_source"] is None for row in written)
