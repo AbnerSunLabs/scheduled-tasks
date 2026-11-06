@@ -1,0 +1,83 @@
+README.md
+  s_0ddf3750cbee5f::t_116f56a75c9664 35,42
+  s_0ddf3750cbee5f::t_aeeac8a3b760d0 34,36-37
+  s_e724e11b93e1e4::t_69592972da5a77 64
+  s_706e37f6c3825e::t_ef74659cb221a9 38-39
+  s_e724e11b93e1e4::t_4125165a18bdc7 40-41
+src/scheduled_tasks/jobs/sync_index_levels.py
+  s_706e37f6c3825e::t_1c079af85f04d3 23
+  s_706e37f6c3825e::t_b30669f179e77e 52,56-59
+  s_706e37f6c3825e::t_173e7e84e242b0 54-55
+  s_706e37f6c3825e::t_66245c40b6949d 126
+src/scheduled_tasks/models/schema.sql
+  s_0ddf3750cbee5f::t_029f5970ec6af1 31
+src/scheduled_tasks/etf/eastmoney_hsi_client.py
+  s_706e37f6c3825e::t_984167aa67d317 6-8
+  s_706e37f6c3825e::t_89c655842a5c00 1
+  s_706e37f6c3825e::t_c5240e52727ff2 67-76,79,82,85,95-112,114,116,118,120-132
+  s_706e37f6c3825e::t_f987307ed1bf48 28,31,35
+  s_706e37f6c3825e::t_f951765efaad60 27,32-34,36-37
+doc/supabase-schema.md
+  s_02e8a783b23f1c::t_7941724b2ad97f 31
+  s_0ddf3750cbee5f::t_c3b136527e0790 30
+  s_706e37f6c3825e::t_e6f4a6e01779cb 97
+  s_706e37f6c3825e::t_0a9bed63882282 106
+  s_0ddf3750cbee5f::t_ead5c80a677a07 198
+  s_0ddf3750cbee5f::t_4ed98c05fa9fbe 27-29
+  s_02e8a783b23f1c::t_9d1ebb2632e68d 32-34
+  s_706e37f6c3825e::t_53ecab9a5ac365 103-105
+  s_706e37f6c3825e::t_af1db61b8cea0a 107-109
+  s_706e37f6c3825e::t_8fb27c4ab50e4c 35-37,306-315
+tests/test_sync_index_levels.py
+  s_706e37f6c3825e::t_72e62323917b94 103-110
+  s_706e37f6c3825e::t_8f7d22235c34a7 194-198
+  s_706e37f6c3825e::t_1ab12500063878 202-203
+  s_706e37f6c3825e::t_89e5237e5c995c 147,155-158
+  s_706e37f6c3825e::t_9c86fdcc6d11b4 11-15
+  s_706e37f6c3825e::t_37c9d29e51896f 75-76
+  s_706e37f6c3825e::t_3081beb331a63a 79-102
+  s_706e37f6c3825e::t_5da1ce1e129a19 149
+  s_706e37f6c3825e::t_52971cc0c83410 77-78
+.env.example
+  s_0ddf3750cbee5f::t_3ff70d17306cc8 3
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "b3159ba78d557da6b4cacd67dbc95fb0cf98960b",
+  "prompts": {},
+  "sessions": {
+    "s_02e8a783b23f1c": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "c3a737db-d7c6-4b78-88e5-6f5b0d3a2d09",
+        "model": "grok-4.7"
+      },
+      "human_author": "AbnerSun <sunyujiejohn@sina.com>"
+    },
+    "s_0ddf3750cbee5f": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "bcf02c2d-c154-4555-9470-ae94ff4e3b60",
+        "model": "grok-4.7"
+      },
+      "human_author": "AbnerSun <sunyujiejohn@sina.com>"
+    },
+    "s_706e37f6c3825e": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "b05bda65-f841-4137-b056-f9005af09770",
+        "model": "grok-4.7"
+      },
+      "human_author": "AbnerSun <sunyujiejohn@sina.com>"
+    },
+    "s_e724e11b93e1e4": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "5cf5c8f2-2818-47ae-8b4f-43ca5eee857d",
+        "model": "grok-4.7"
+      },
+      "human_author": "AbnerSun <sunyujiejohn@sina.com>"
+    }
+  }
+}
