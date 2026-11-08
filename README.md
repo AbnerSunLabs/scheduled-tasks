@@ -34,11 +34,10 @@ GitHub Actions 定时任务：将 **Yahoo Finance（yfinance）** ETF 日 K、�
 ### 指数收盘
 
 - 中证官网 `index-perf`：中证500 `000905.SH`、中证红利 `000922.SH`、中证医疗 `399989.SZ`、全指消费 `000990.SH`、内地消费 `000942.SH`、中证传媒 `399971.SZ`、全指信息 `000993.SH`、证券公司 `399975.SZ`、中证红利低波动100 `930955.CSI`。
-- 同花顺扶摇 `GET /api/a-share-index/prices/historical`：创业板R `399606.SZ`。中证接口对它返回空。
 - 新浪离岸日线 `fx_susdcnh`：美元兑人民币 `USDCNH.OTH`，收盘按 1 美元计。`indices.code` 用已有的 `OTH` 后缀。
-- 只写 `index_daily_metrics.close` 与 `price_source`（`csindex` / `fuyao` / `sina`）；PE/PB 传空，不覆盖红色火箭已有估值。
-- 入口：`python -m scheduled_tasks.jobs.sync_index_levels`。`FUYAO_API_KEY` 只给创业板R；没配时这一只失败，其余指数照常写入。
-- 闹钟在数据库里：工作日北京时间 19:30、20:30、21:30 叫醒 `Sync index levels`，并写上当天日期。这一天的中证500收盘已经在库里就不再叫。手点运行可以不填日期。缺 `FUYAO_API_KEY` 不阻断这次任务。
+- 只写 `index_daily_metrics.close` 与 `price_source`（`csindex` / `eastmoney` / `sina`）；PE/PB 传空，不覆盖红色火箭已有估值。
+- 入口：`python -m scheduled_tasks.jobs.sync_index_levels`。
+- 闹钟在数据库里：工作日北京时间 19:30、20:30、21:30 叫醒 `Sync index levels`，并写上当天日期。这一天的中证500收盘已经在库里就不再叫。手点运行可以不填日期。
 
 ### 官网双源校验
 
@@ -61,7 +60,6 @@ Repository Secrets:
 
 - `DATABASE_URL`：Supabase PostgreSQL 连接串
 - `BARK_KEY`：Bark 推送 key（未配置时跳过通知，不阻断主任务）
-- `FUYAO_API_KEY`：同花顺扶摇 REST `X-api-key`（只拉创业板R；未配置时跳过这一只，不阻断 `sync_index_levels`）
 
 Do not print secret values in logs, documents, issue comments, or chat.
 

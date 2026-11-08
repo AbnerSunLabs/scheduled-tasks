@@ -149,11 +149,6 @@ def test_sync_writes_close_only_and_keeps_valuation_null(monkeypatch: pytest.Mon
         assert end >= start
         return [{"trade_date": "2026-10-19", "close": 6800.66 if index_code == "000905.SH" else 11630.21}]
 
-    def fake_fuyao(thscode: str, *, start: date, end: date, api_key: str) -> list[dict]:
-        assert thscode == "399606.SZ"
-        assert api_key == "test-key"
-        return [{"trade_date": "2026-10-20", "close": 3061.17}]
-
     def fake_usdcnh(*, start: date, end: date) -> list[dict]:
         assert end >= start
         return [{"trade_date": "2026-10-20", "close": 6.6676}]
@@ -164,7 +159,6 @@ def test_sync_writes_close_only_and_keeps_valuation_null(monkeypatch: pytest.Mon
         return [{"trade_date": date(2026, 10, 20), "close": 23041.32}]
 
     monkeypatch.setattr("scheduled_tasks.jobs.sync_index_levels.fetch_index_daily_bars", fake_csi)
-    monkeypatch.setattr("scheduled_tasks.jobs.sync_index_levels.fetch_index_daily_closes", fake_fuyao)
     monkeypatch.setattr("scheduled_tasks.jobs.sync_index_levels.fetch_usdcnh_daily_closes", fake_usdcnh)
     monkeypatch.setattr(
         "scheduled_tasks.jobs.sync_index_levels.fetch_eastmoney_index_closes",
@@ -188,7 +182,6 @@ def test_sync_writes_close_only_and_keeps_valuation_null(monkeypatch: pytest.Mon
         Conn(),
         today=date(2026, 10, 20),
         lookback_days=10,
-        api_key="test-key",
     )
     assert summary.status == "success"
     assert summary.success_codes == [
@@ -203,7 +196,6 @@ def test_sync_writes_close_only_and_keeps_valuation_null(monkeypatch: pytest.Mon
         "000993.SH",
         "399975.SZ",
         "930955.CSI",
-        "399606.SZ",
         "HSI.HI",
         "399006.SZ",
         "HSHCI.HI",
@@ -212,7 +204,7 @@ def test_sync_writes_close_only_and_keeps_valuation_null(monkeypatch: pytest.Mon
         "SPX.OTH",
         "USDCNH.OTH",
     ]
-    assert {row["price_source"] for row in written} == {"csindex", "fuyao", "sina", "eastmoney"}
-    outside_csindex = {"399606.SZ", "USDCNH.OTH", "HSI.HI", "HSHCI.HI", "SPX.OTH", "399006.SZ"}
+    assert {row["price_source"] for row in written} == {"csindex", "sina", "eastmoney"}
+    outside_csindex = {"USDCNH.OTH", "HSI.HI", "HSHCI.HI", "SPX.OTH", "399006.SZ"}
     assert sum(row["index_code"] not in outside_csindex for row in written) == 13
     assert all(row["pe_ttm"] is None and row["valuation_source"] is None for row in written)

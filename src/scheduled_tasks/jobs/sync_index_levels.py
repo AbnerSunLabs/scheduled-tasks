@@ -22,10 +22,6 @@ from scheduled_tasks.etf.eastmoney_hsi_client import (
     PRICE_SOURCE as EASTMONEY_PRICE_SOURCE,
     fetch_eastmoney_index_closes,
 )
-from scheduled_tasks.etf.fuyao_index_client import (
-    FUYAO_PRICE_SOURCE,
-    fetch_index_daily_closes,
-)
 from scheduled_tasks.etf.sina_forex_client import (
     PRICE_SOURCE as SINA_PRICE_SOURCE,
     fetch_usdcnh_daily_closes,
@@ -35,7 +31,7 @@ JOB_NAME = "sync_index_levels"
 SUMMARY_PATH = Path("artifacts/sync_index_levels_summary.json")
 DEFAULT_LOOKBACK_DAYS = 45
 
-# 6 位中证样本走官网 perf。创业板R 不在中证样本，走同花顺扶摇深证指数。
+# 6 位中证样本走官网 perf。
 INDEX_LEVEL_SPECS: tuple[tuple[str, str, str, str], ...] = (
     ("000905.SH", "中证500", "宽基", "csindex"),
     ("000922.SH", "中证红利", "策略", "csindex"),
@@ -48,7 +44,6 @@ INDEX_LEVEL_SPECS: tuple[tuple[str, str, str, str], ...] = (
     ("000993.SH", "全指信息", "行业", "csindex"),
     ("399975.SZ", "证券公司", "行业", "csindex"),
     ("930955.CSI", "中证红利低波动100", "策略", "csindex"),
-    ("399606.SZ", "创业板R", "宽基", FUYAO_PRICE_SOURCE),
     # 恒生、恒生医疗不在中证样本。标普用指数表里已有的 SPX.OTH。
     ("HSI.HI", "恒生指数", "宽基", EASTMONEY_PRICE_SOURCE),
     # 创业板指不在中证官网样本，官网返回空。深市指数走东财 secid=0.399006。
@@ -120,7 +115,6 @@ def fetch_closes(
     *,
     start: date,
     end: date,
-    api_key: str,
 ) -> list[dict[str, Any]]:
     if source == EASTMONEY_PRICE_SOURCE:
         bars = fetch_eastmoney_index_closes(index_code, start=start, end=end)
@@ -144,12 +138,7 @@ def fetch_closes(
         if not rows:
             raise RuntimeError(f"csindex returned no close for {index_code}")
         return _without_start_placeholder(rows, start)
-    bars = fetch_index_daily_closes(index_code, start=start, end=end, api_key=api_key)
-    rows = [
-        _close_row(index_code, str(bar["trade_date"]), float(bar["close"]), FUYAO_PRICE_SOURCE)
-        for bar in bars
-    ]
-    return _without_start_placeholder(rows, start)
+    raise RuntimeError(f"unknown price source {source} for {index_code}")
 
 
 def sync_all_index_levels(
@@ -157,15 +146,12 @@ def sync_all_index_levels(
     *,
     today: date | None = None,
     lookback_days: int = DEFAULT_LOOKBACK_DAYS,
-    api_key: str = "",
 ) -> SyncSummary:
     summary = SyncSummary()
     start, end = _window(today or date.today(), lookback_days)
     for index_code, name, category, source in INDEX_LEVEL_SPECS:
         try:
-            if source == FUYAO_PRICE_SOURCE and not api_key.strip():
-                raise RuntimeError("FUYAO_API_KEY is not set")
-            rows = fetch_closes(index_code, source, start=start, end=end, api_key=api_key)
+            rows = fetch_closes(index_code, source, start=start, end=end)
             ensure_index_row(conn, code=index_code, name=name, category=category)
             written = upsert_index_daily_metrics(conn, rows)
             conn.commit()
@@ -195,7 +181,6 @@ def resolve_session_date(raw: str | None, *, today: date | None = None) -> date:
 
 def run(*, lookback_days: int = DEFAULT_LOOKBACK_DAYS) -> SyncSummary:
     settings = load_settings()
-    api_key = (os.environ.get("FUYAO_API_KEY") or "").strip()
     session_day = resolve_session_date(os.environ.get("SESSION_DATE"))
     codes = tuple(spec[0] for spec in INDEX_LEVEL_SPECS)
     conn = connect(settings.database_url)
@@ -215,7 +200,6 @@ def run(*, lookback_days: int = DEFAULT_LOOKBACK_DAYS) -> SyncSummary:
             conn,
             today=session_day,
             lookback_days=lookback_days,
-            api_key=api_key,
         )
         summary.run_id = run_id
         finish_sync_run(

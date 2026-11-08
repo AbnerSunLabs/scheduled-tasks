@@ -195,7 +195,7 @@ erDiagram
 
 ### `index_daily_metrics` — 指数日指标
 
-> DDL 见 `schema.sql` 与 `migrations/20260721_add_index_daily_metrics.sql`。表注释：指数日指标（收盘点位、PE TTM、PB）。与已删除的 `index_daily_prices` 不同：同一主键下可同时存点位与估值字段。估值主写：`sync_hongsehuojian_fill_validate`。收盘另由 `sync_index_levels` 写入跟踪指数（只更新 `close` / `price_source`）：`000905.SH`、`000922.SH`、`399989.SZ`、`000990.SH`、`000942.SH`、`399971.SZ`、`000993.SH`、`399975.SZ`、`930955.CSI`、`399606.SZ`。
+> DDL 见 `schema.sql` 与 `migrations/20260721_add_index_daily_metrics.sql`。表注释：指数日指标（收盘点位、PE TTM、PB）。与已删除的 `index_daily_prices` 不同：同一主键下可同时存点位与估值字段。估值主写：`sync_hongsehuojian_fill_validate`。收盘另由 `sync_index_levels` 写入跟踪指数（只更新 `close` / `price_source`）：`000905.SH`、`000922.SH`、`399989.SZ`、`000990.SH`、`000942.SH`、`399971.SZ`、`000993.SH`、`399975.SZ`、`930955.CSI`。
 
 | 列名               | 类型          | 约束                                | 说明                                              |
 | ------------------ | ------------- | ----------------------------------- | ------------------------------------------------- |
