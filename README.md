@@ -39,6 +39,13 @@ GitHub Actions 定时任务：将 **Yahoo Finance（yfinance）** ETF 日 K、�
 - 入口：`python -m scheduled_tasks.jobs.sync_index_levels`。
 - 闹钟在数据库里：工作日北京时间 19:30、20:30、21:30 叫醒 `Sync index levels`，并写上当天日期。这一天的中证500收盘已经在库里就不再叫。手点运行可以不填日期。
 
+### 场外基金单位净值
+
+- 当前同步 `004752`（广发中证传媒ETF联接A）和 `502010`（易方达中证全指证券公司指数(LOF)A）。
+- 数据源：天天基金 `pingzhongdata/{code}.js` 的 `Data_netWorthTrend`。每次把脚本里的全部单位净值 upsert 到 `fund_nav_daily`。
+- 入口：`python -m scheduled_tasks.jobs.sync_fund_nav`。
+- 闹钟：工作日北京 21:30 / 22:30 / 23:30。两只当天净值都已经在库里就不再叫。带日期，休市跳过。任一当天净值还没披露时任务失败，下一档再试；下一交易日的成功跑会把漏掉的日期一并补上。
+
 ### 官网双源校验
 
 - 上交所（ETF）+ 中证（指数）vs 库；默认只比对告警，`--apply-official --yes` 才纠偏；纠偏后主写不覆盖不复权 OHLC，`adj_check` 仍可刷复权列。

@@ -116,6 +116,21 @@ create table if not exists etf_daily (
 create index if not exists etf_daily_trade_date_idx
   on etf_daily (trade_date desc);
 
+-- 场外基金单位净值。主写：sync_fund_nav。页面只读。当前基金：004752、502010。
+create table if not exists fund_nav_daily (
+  fund_code text not null,
+  nav_date date not null,
+  unit_nav numeric not null,
+  source text not null,
+  updated_at timestamptz not null default now(),
+  primary key (fund_code, nav_date),
+  constraint fund_nav_daily_code_format check (fund_code ~ '^[0-9]{6}$'),
+  constraint fund_nav_daily_unit_nav_positive check (unit_nav > 0)
+);
+
+create index if not exists fund_nav_daily_nav_date_idx
+  on fund_nav_daily (nav_date desc);
+
 create table if not exists index_valuation (
   tracking_index_code text primary key,
   trade_date date not null,

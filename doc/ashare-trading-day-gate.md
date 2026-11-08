@@ -46,6 +46,7 @@ python -m scheduled_tasks.market.ashare_trading_day --github-output
 - `sync-etf-kline.yml`（ETF 日 K；仅带日期的 `incremental`）
 - `sync-index-valuation.yml`（指数估值）
 - `sync-index-levels.yml`（指数收盘）
+- `sync-fund-nav.yml`（场外基金单位净值，当前 004752、502010）
 - `sync-official-cross-check.yml`（官网双源校验）
 
 ## 非目标

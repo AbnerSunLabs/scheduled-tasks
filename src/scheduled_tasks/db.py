@@ -670,3 +670,29 @@ def replace_index_industry_weights(
             values,
         )
     return len(values)
+
+
+def upsert_fund_nav_daily(
+    conn: Connection[dict[str, Any]],
+    rows: Iterable[dict[str, Any]],
+) -> int:
+    """按 (fund_code, nav_date) 覆盖单位净值。"""
+    values = list(rows)
+    if not values:
+        return 0
+    with conn.cursor() as cur:
+        cur.executemany(
+            """
+            insert into public.fund_nav_daily (
+              fund_code, nav_date, unit_nav, source, updated_at
+            ) values (
+              %(fund_code)s, %(nav_date)s, %(unit_nav)s, %(source)s, now()
+            )
+            on conflict (fund_code, nav_date) do update
+            set unit_nav = excluded.unit_nav,
+                source = excluded.source,
+                updated_at = now()
+            """,
+            values,
+        )
+    return len(values)

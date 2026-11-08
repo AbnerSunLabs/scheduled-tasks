@@ -1,0 +1,53 @@
+name: Sync fund nav
+
+on:
+  workflow_dispatch:
+    inputs:
+      session_date:
+        description: "已披露净值的交易日 YYYY-MM-DD。数据库闹钟会写上；手点运行可以留空。"
+        required: false
+        type: string
+
+jobs:
+  sync-fund-nav:
+    runs-on: ubuntu-latest
+    concurrency:
+      group: sync-fund-nav
+      cancel-in-progress: false
+    outputs:
+      should_run: ${{ steps.gate.outputs.should_run }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Validate required configuration
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          if [ -z "$DATABASE_URL" ]; then
+            echo "::error::Missing GitHub Secret: DATABASE_URL"
+            exit 1
+          fi
+
+      - name: Install dependencies
+        run: python -m pip install -e .
+
+      - name: Check A-share trading day
+        id: gate
+        uses: ./.github/actions/check-ashare-trading-day
+        with:
+          enabled: ${{ inputs.session_date != '' }}
+          date: ${{ inputs.session_date }}
+
+      - name: Sync fund unit nav
+        if: steps.gate.outputs.should_run == 'true'
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          SESSION_DATE: ${{ inputs.session_date }}
+        run: python -m scheduled_tasks.jobs.sync_fund_nav

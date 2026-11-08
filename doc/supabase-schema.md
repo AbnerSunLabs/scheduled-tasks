@@ -32,6 +32,7 @@ RLS：
 | 表   | `sync_runs`              | 同步任务执行记录（含 `meta`）                        | **写入**                                           |
 | 表   | `etf_pool`               | ETF 当前池（PK=`etf_code`，非历史快照）              | **只读**                                           |
 | 表   | `etf_daily`              | ETF 日行情（OHLC + volume + 前/后复权 + 来源）       | **主写**                                           |
+| 表   | `fund_nav_daily`         | 场外基金单位净值（当前 004752、502010）              | **主写** `sync_fund_nav`                           |
 | 表   | `index_valuation`        | 跟踪指数估值快照（当日/5y/10y PE）                   | **红色火箭可写**                                   |
 | 视图 | `index_latest_snapshot`  | 指数最新快照（价列仍恒 null + `index_valuation` PE） | 可读                                               |
 | 视图 | `index_detail_snapshot`  | 指数各维度最新日期（`latest_price_date` 仍恒 null）  | 可读                                               |
@@ -317,6 +318,20 @@ erDiagram
 > 已删除闲置列（job 从不写）：`nav` / `premium_rate` / `fund_size` / `listing_days` / `bid_price` / `ask_price`（`20260722_drop_etf_daily_idle_columns.sql`）。成交额列删除见 `20260717_drop_etf_daily_amount_columns.sql`。
 
 **索引：** `etf_daily_trade_date_idx`：`(trade_date DESC)`
+
+### `fund_nav_daily` — 场外基金单位净值
+
+| 列名 | 类型 | 约束 | 说明 |
+| --- | --- | --- | --- |
+| `fund_code` | `text` | **PK** | 6 位基金代码。当前写 `004752`、`502010` |
+| `nav_date` | `date` | **PK** | 净值日期，上海日历日。领域名 `FundNav.date` |
+| `unit_nav` | `numeric` | NOT NULL, `> 0` | 单位净值 |
+| `source` | `text` | NOT NULL | 当前为 `eastmoney` |
+| `updated_at` | `timestamptz` | NOT NULL, DEFAULT `now()` | 最近一次写入 |
+
+公开页只读：`anon` 与 `authenticated` 有 SELECT。写入只走 `sync_fund_nav`。
+
+**索引：** `fund_nav_daily_nav_date_idx`：`(nav_date DESC)`
 
 ---
 
