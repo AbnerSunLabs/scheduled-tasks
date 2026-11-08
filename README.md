@@ -2,7 +2,7 @@
 
 GitHub Actions 定时任务：将 **Yahoo Finance（yfinance）** ETF 日 K、以及 **红色火箭** 指数估值同步到 Supabase PostgreSQL；并维护共享行情表的 **RLS**（`cockpit_apply_*` 函数仍由历史 migration 提供）。
 
-> 说明：ETF **价格**主源为 yfinance；补缺 / 估值 / 行业权重由红色火箭写入。汇率同步与 `fx_rates` 表已下线。驾驶舱用户账本 12 表已下线。不再使用 BaoStock / AKShare；`etf_daily` 不维护成交额；**无交易日历表**。工作日 GHA `schedule`（定时）启动前用公开 HTTP 判定是否交易日（休市跳过；查询失败则照跑并 Bark 警告），见 [doc/ashare-trading-day-gate.md](./doc/ashare-trading-day-gate.md)。
+> 说明：ETF **价格**主源为 yfinance；补缺 / 估值 / 行业权重由红色火箭写入。汇率同步与 `fx_rates` 表已下线。驾驶舱用户账本 12 表已下线。不再使用 BaoStock / AKShare；`etf_daily` 不维护成交额；**无交易日历表**。定时闹钟在数据库里，到点叫醒对应的 GitHub 任务并写上上海日期；带日期的任务才用公开 HTTP 判断这一天是否为交易日（休市跳过；查询失败则照跑并 Bark 警告），见 [doc/ashare-trading-day-gate.md](./doc/ashare-trading-day-gate.md)。
 
 本仓库独立于 `stock-view` / `stock-charts`。旧指数日线表 `index_daily_prices` 已删除；`index_daily_metrics` 存收盘/PE/PB（Phase 1 主跑沪深 300）。红色火箭 job `sync_hongsehuojian_fill_validate` 可刷新 `index_valuation` 与 `index_daily_metrics` PE/PB。表结构见 [doc/supabase-schema.md](./doc/supabase-schema.md)。
 
@@ -14,12 +14,12 @@ GitHub Actions 定时任务：将 **Yahoo Finance（yfinance）** ETF 日 K、�
 - 写入 `etf_daily`：不复权 OHLCV + 前/后复权 OHLC + `price_source='yfinance'`；已官网纠偏（`sse`/`szse`）的行不覆盖。
 - 写入 `sync_runs`（`job_name=sync_etf_kline_yfinance`）。
 - 模式：`full` / `incremental` / `adj_check`。
-- GHA：`同步 ETF 日 K 到 Supabase`（工作日北京约 09:40 补前一交易日收盘，以及 18:10 / 18:30 / 19:00；定时跑前做交易日闸门，周日 `adj_check`（复权巡检）不加）。
+- 闹钟：工作日北京 09:40 / 10:40 补前一交易日收盘；18:10 / 18:30 / 19:00 试写当日日 K，沪深300ETF 当天收盘已在库里就不再叫。这两档带日期，休市跳过。周日 10:00 / 11:00 做复权巡检，当天已经成功跑过就不再叫。
 
 ### 指数估值（红色火箭）
 
 - 数据源：华夏基金「红色火箭」站内 `fundex-quote` JSON（**非官方**）。
-- GHA：`同步指数估值到 Supabase`（工作日北京约 19:15；定时跑前做交易日闸门）。
+- 闹钟：工作日北京 19:15 / 20:15 / 21:15。沪深300估值快照已经是当天就不再叫。带日期，休市跳过。
 - Phase 1 默认：`510300` / `000300.SH`；`valuation-only`。
 - 写入：
   - `index_valuation`：当日 PE + 5y/10y 均值快照
@@ -42,6 +42,7 @@ GitHub Actions 定时任务：将 **Yahoo Finance（yfinance）** ETF 日 K、�
 ### 官网双源校验
 
 - 上交所（ETF）+ 中证（指数）vs 库；默认只比对告警，`--apply-official --yes` 才纠偏；纠偏后主写不覆盖不复权 OHLC，`adj_check` 仍可刷复权列。
+- 闹钟：工作日北京 20:00 / 21:00。当天已经成功比对过就不再叫。带日期，休市跳过。
 - 入口：`python -m scheduled_tasks.jobs.sync_official_cross_check`（见 [doc/official-cross-check.md](doc/official-cross-check.md)）
 
 ### 共享 RLS（历史 cockpit migration）

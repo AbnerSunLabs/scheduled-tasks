@@ -1,16 +1,12 @@
 name: 同步 ETF 日 K 到 Supabase
 
 on:
-  schedule:
-    # 工作日北京时间约 09:40 → incremental（补前一交易日收盘；Yahoo 收盘价次日早上才齐）
-    - cron: "40 1 * * 1-5"
-    # 工作日北京时间约 18:10 / 18:30 / 19:00 → incremental
-    - cron: "10,30 10 * * 1-5"
-    - cron: "0 11 * * 1-5"
-    # 每周日北京时间上午 10:00 → adj_check
-    - cron: "0 2 * * 0"
   workflow_dispatch:
     inputs:
+      session_date:
+        description: "闹钟写上的上海日期 YYYY-MM-DD。手点运行可以留空。复权巡检不填。"
+        required: false
+        type: string
       mode:
         description: "同步模式"
         required: true
@@ -71,25 +67,15 @@ jobs:
 
       - name: Determine sync mode
         id: mode
-        run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "mode=${{ inputs.mode }}" >> "$GITHUB_OUTPUT"
-          else
-            # schedule: 周日 cron 为 "0 2 * * 0"；其余工作日为 incremental
-            dow=$(date -u +%u)
-            if [ "$dow" = "7" ]; then
-              echo "mode=adj_check" >> "$GITHUB_OUTPUT"
-            else
-              echo "mode=incremental" >> "$GITHUB_OUTPUT"
-            fi
-          fi
+        run: echo "mode=${{ inputs.mode }}" >> "$GITHUB_OUTPUT"
 
-      # 仅工作日 schedule 的 incremental 查交易日；手动 / 周日 adj_check 放行
+      # 带日期的增量同步才查交易日。手点运行、周日复权巡检放行。
       - name: Check A-share trading day
         id: gate
         uses: ./.github/actions/check-ashare-trading-day
         with:
-          enabled: ${{ github.event_name == 'schedule' && steps.mode.outputs.mode == 'incremental' }}
+          enabled: ${{ inputs.mode == 'incremental' && inputs.session_date != '' }}
+          date: ${{ inputs.session_date }}
 
       - name: Sync ETF kline
         if: steps.gate.outputs.should_run == 'true'
@@ -98,10 +84,14 @@ jobs:
           SYNC_MODE: ${{ steps.mode.outputs.mode }}
           INPUT_CODES: ${{ inputs.codes }}
           INPUT_FORCE: ${{ inputs.force }}
+          SESSION_DATE: ${{ inputs.session_date }}
         run: |
           set -euo pipefail
           mkdir -p artifacts
           args=(--mode="$SYNC_MODE")
+          if [ -n "${SESSION_DATE:-}" ]; then
+            args+=(--end="$SESSION_DATE")
+          fi
           if [ -n "${INPUT_CODES:-}" ]; then
             args+=(--codes="$INPUT_CODES")
           fi

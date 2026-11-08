@@ -1,14 +1,14 @@
 # A 股交易日闸门（GHA）
 
-工作日 `schedule`（定时触发）在跑同步前，用公开 HTTP 判定上海时区「今天」是否为 A 股交易日；休市则跳过同步，避免法定节假日空跑。
+数据库闹钟在叫醒时写上上海日期。任务认这个日期，不认 runner 真正开工时的「今天」。休市则跳过，避免法定节假日空跑。
 
 ## 行为
 
-| 触发                          | 行为                       |
-| ----------------------------- | -------------------------- |
-| `schedule` + 工作日增量类任务 | 查日历；休市跳过；开市照跑 |
-| `workflow_dispatch`（手动）   | 不查日历，一律跑           |
-| 周日 `adj_check`（复权巡检）  | 不查日历                   |
+| 触发 | 行为 |
+| --- | --- |
+| 闹钟带上 `session_date` 的增量 / 估值 / 校验 | 查这一天的日历；休市跳过；开市照跑 |
+| 手点运行，没填日期 | 不查日历，一律跑 |
+| 周日复权巡检 | 不查日历 |
 
 | 日历结果              | 同步                  | Bark（推送）                         |
 | --------------------- | --------------------- | ------------------------------------ |
@@ -43,8 +43,9 @@ python -m scheduled_tasks.market.ashare_trading_day --github-output
 
 已接入：
 
-- `sync-etf-kline.yml`（ETF 日 K；仅 `incremental`）
+- `sync-etf-kline.yml`（ETF 日 K；仅带日期的 `incremental`）
 - `sync-index-valuation.yml`（指数估值）
+- `sync-index-levels.yml`（指数收盘）
 - `sync-official-cross-check.yml`（官网双源校验）
 
 ## 非目标

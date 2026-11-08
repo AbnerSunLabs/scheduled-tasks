@@ -1,11 +1,12 @@
 name: 官网双源校验（ETF）
 
 on:
-  schedule:
-    # 工作日北京时间约 20:00（ETF 日 K 同步之后）
-    - cron: "0 12 * * 1-5"
   workflow_dispatch:
     inputs:
+      session_date:
+        description: "闹钟写上的上海日期 YYYY-MM-DD。手点运行可以留空。"
+        required: false
+        type: string
       mode:
         description: "校验窗口"
         required: true
@@ -72,23 +73,17 @@ jobs:
       - name: Determine args
         id: args
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "mode=${{ inputs.mode }}" >> "$GITHUB_OUTPUT"
-            echo "from_pool=${{ inputs.from_pool }}" >> "$GITHUB_OUTPUT"
-            echo "etf_code=${{ inputs.etf_code }}" >> "$GITHUB_OUTPUT"
-            echo "lookback_bars=${{ inputs.lookback_bars }}" >> "$GITHUB_OUTPUT"
-          else
-            echo "mode=incremental" >> "$GITHUB_OUTPUT"
-            echo "from_pool=true" >> "$GITHUB_OUTPUT"
-            echo "etf_code=512170" >> "$GITHUB_OUTPUT"
-            echo "lookback_bars=30" >> "$GITHUB_OUTPUT"
-          fi
+          echo "mode=${{ inputs.mode }}" >> "$GITHUB_OUTPUT"
+          echo "from_pool=${{ inputs.from_pool }}" >> "$GITHUB_OUTPUT"
+          echo "etf_code=${{ inputs.etf_code }}" >> "$GITHUB_OUTPUT"
+          echo "lookback_bars=${{ inputs.lookback_bars }}" >> "$GITHUB_OUTPUT"
 
       - name: Check A-share trading day
         id: gate
         uses: ./.github/actions/check-ashare-trading-day
         with:
-          enabled: ${{ github.event_name == 'schedule' }}
+          enabled: ${{ inputs.session_date != '' }}
+          date: ${{ inputs.session_date }}
 
       - name: Official cross-check (compare-only)
         if: steps.gate.outputs.should_run == 'true'
@@ -98,10 +93,14 @@ jobs:
           FROM_POOL: ${{ steps.args.outputs.from_pool }}
           ETF_CODE: ${{ steps.args.outputs.etf_code }}
           LOOKBACK_BARS: ${{ steps.args.outputs.lookback_bars }}
+          SESSION_DATE: ${{ inputs.session_date }}
         run: |
           set -euo pipefail
           mkdir -p artifacts
           args=(--mode="$SYNC_MODE" --lookback-bars="$LOOKBACK_BARS")
+          if [ -n "${SESSION_DATE:-}" ]; then
+            args+=(--end="$SESSION_DATE")
+          fi
           if [ "${FROM_POOL}" = "true" ]; then
             args+=(--from-pool)
           else

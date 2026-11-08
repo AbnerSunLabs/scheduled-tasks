@@ -1,11 +1,12 @@
 name: 同步指数估值到 Supabase
 
 on:
-  schedule:
-    # 工作日北京时间约 19:15（ETF 日 K 之后）
-    - cron: "15 11 * * 1-5"
   workflow_dispatch:
     inputs:
+      session_date:
+        description: "闹钟写上的上海日期 YYYY-MM-DD。手点运行可以留空。"
+        required: false
+        type: string
       mode:
         description: "同步模式"
         required: true
@@ -68,21 +69,16 @@ jobs:
       - name: Determine sync mode
         id: mode
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "mode=${{ inputs.mode }}" >> "$GITHUB_OUTPUT"
-            echo "etf_code=${{ inputs.etf_code }}" >> "$GITHUB_OUTPUT"
-            echo "index_code=${{ inputs.index_code }}" >> "$GITHUB_OUTPUT"
-          else
-            echo "mode=valuation-only" >> "$GITHUB_OUTPUT"
-            echo "etf_code=510300" >> "$GITHUB_OUTPUT"
-            echo "index_code=000300.SH" >> "$GITHUB_OUTPUT"
-          fi
+          echo "mode=${{ inputs.mode }}" >> "$GITHUB_OUTPUT"
+          echo "etf_code=${{ inputs.etf_code }}" >> "$GITHUB_OUTPUT"
+          echo "index_code=${{ inputs.index_code }}" >> "$GITHUB_OUTPUT"
 
       - name: Check A-share trading day
         id: gate
         uses: ./.github/actions/check-ashare-trading-day
         with:
-          enabled: ${{ github.event_name == 'schedule' }}
+          enabled: ${{ inputs.session_date != '' }}
+          date: ${{ inputs.session_date }}
 
       - name: Sync index valuation
         if: steps.gate.outputs.should_run == 'true'
@@ -91,13 +87,15 @@ jobs:
           SYNC_MODE: ${{ steps.mode.outputs.mode }}
           ETF_CODE: ${{ steps.mode.outputs.etf_code }}
           INDEX_CODE: ${{ steps.mode.outputs.index_code }}
+          SESSION_DATE: ${{ inputs.session_date }}
         run: |
           set -euo pipefail
           mkdir -p artifacts
-          python -m scheduled_tasks.jobs.sync_hongsehuojian_fill_validate \
-            --mode="$SYNC_MODE" \
-            --etf-code="$ETF_CODE" \
-            --index-code="$INDEX_CODE"
+          args=(--mode="$SYNC_MODE" --etf-code="$ETF_CODE" --index-code="$INDEX_CODE")
+          if [ -n "${SESSION_DATE:-}" ]; then
+            args+=(--end="$SESSION_DATE")
+          fi
+          python -m scheduled_tasks.jobs.sync_hongsehuojian_fill_validate "${args[@]}"
 
       - name: Upload summary artifact
         if: always() && steps.gate.outputs.should_run == 'true'
