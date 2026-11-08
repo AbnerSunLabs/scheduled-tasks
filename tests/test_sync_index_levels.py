@@ -16,10 +16,24 @@ from scheduled_tasks.etf.eastmoney_hsi_client import (
 from scheduled_tasks.etf.sina_forex_client import parse_usdcnh_kline
 from scheduled_tasks.jobs.sync_index_levels import (
     _without_start_placeholder,
+    resolve_session_date,
     sync_all_index_levels,
 )
 
 _SHANGHAI = ZoneInfo("Asia/Shanghai")
+
+
+def test_resolve_session_date_keeps_the_pinned_day() -> None:
+    assert resolve_session_date("2026-11-06", today=date(2026, 11, 8)) == date(2026, 11, 6)
+
+
+def test_resolve_session_date_uses_today_when_empty() -> None:
+    assert resolve_session_date("  ", today=date(2026, 11, 8)) == date(2026, 11, 8)
+
+
+def test_resolve_session_date_rejects_a_bad_day() -> None:
+    with pytest.raises(RuntimeError, match="YYYY-MM-DD"):
+        resolve_session_date("11-06")
 
 
 def test_fuyao_parses_daily_close_in_shanghai() -> None:

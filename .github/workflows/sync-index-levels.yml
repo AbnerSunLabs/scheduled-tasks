@@ -2,13 +2,18 @@ name: Sync index levels
 
 on:
   workflow_dispatch:
-  schedule:
-    # 北京时间 19:30，A 股收盘之后；交易日门禁在 job 内。
-    - cron: "30 11 * * 1-5"
+    inputs:
+      session_date:
+        description: "已收盘的交易日 YYYY-MM-DD。数据库闹钟会写上；手点运行可以留空。"
+        required: false
+        type: string
 
 jobs:
   sync-index-levels:
     runs-on: ubuntu-latest
+    concurrency:
+      group: sync-index-levels
+      cancel-in-progress: false
     outputs:
       should_run: ${{ steps.gate.outputs.should_run }}
     steps:
@@ -42,11 +47,13 @@ jobs:
         id: gate
         uses: ./.github/actions/check-ashare-trading-day
         with:
-          enabled: ${{ github.event_name == 'schedule' }}
+          enabled: ${{ inputs.session_date != '' }}
+          date: ${{ inputs.session_date }}
 
       - name: Sync three index closes
         if: steps.gate.outputs.should_run == 'true'
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           FUYAO_API_KEY: ${{ secrets.FUYAO_API_KEY }}
+          SESSION_DATE: ${{ inputs.session_date }}
         run: python -m scheduled_tasks.jobs.sync_index_levels

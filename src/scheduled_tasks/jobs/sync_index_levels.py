@@ -182,9 +182,21 @@ def sync_all_index_levels(
     return summary
 
 
+def resolve_session_date(raw: str | None, *, today: date | None = None) -> date:
+    """闹钟叫醒时写死的交易日。没带日期就用运行当天。"""
+    text = (raw or "").strip()
+    if not text:
+        return today or date.today()
+    try:
+        return date.fromisoformat(text)
+    except ValueError as exc:
+        raise RuntimeError(f"SESSION_DATE must be YYYY-MM-DD, got {text}") from exc
+
+
 def run(*, lookback_days: int = DEFAULT_LOOKBACK_DAYS) -> SyncSummary:
     settings = load_settings()
     api_key = (os.environ.get("FUYAO_API_KEY") or "").strip()
+    session_day = resolve_session_date(os.environ.get("SESSION_DATE"))
     codes = tuple(spec[0] for spec in INDEX_LEVEL_SPECS)
     conn = connect(settings.database_url)
     summary = SyncSummary()
@@ -193,9 +205,18 @@ def run(*, lookback_days: int = DEFAULT_LOOKBACK_DAYS) -> SyncSummary:
             conn,
             JOB_NAME,
             codes,
-            meta={"lookback_days": lookback_days, "index_count": len(codes)},
+            meta={
+                "lookback_days": lookback_days,
+                "index_count": len(codes),
+                "session_date": session_day.isoformat(),
+            },
         )
-        summary = sync_all_index_levels(conn, lookback_days=lookback_days, api_key=api_key)
+        summary = sync_all_index_levels(
+            conn,
+            today=session_day,
+            lookback_days=lookback_days,
+            api_key=api_key,
+        )
         summary.run_id = run_id
         finish_sync_run(
             conn,

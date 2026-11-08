@@ -8,6 +8,10 @@ inputs:
     description: 是否真正查询日历（false 则 should_run=true）
     required: false
     default: "true"
+  date:
+    description: 要判断的交易日 YYYY-MM-DD。留空则用上海时区的今天。
+    required: false
+    default: ""
 
 outputs:
   should_run:
@@ -32,6 +36,8 @@ runs:
     - name: Probe A-share trading day
       id: probe
       shell: bash
+      env:
+        CAL_DATE: ${{ inputs.date }}
       run: |
         set -euo pipefail
         if [ "${{ inputs.enabled }}" != "true" ]; then
@@ -44,7 +50,18 @@ runs:
           exit 0
         fi
         set +e
-        python -m scheduled_tasks.market.ashare_trading_day --github-output
+        if [ -n "${CAL_DATE}" ]; then
+          case "${CAL_DATE}" in
+            [0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]) ;;
+            *)
+              echo "::error::session date must be YYYY-MM-DD"
+              exit 1
+              ;;
+          esac
+          python -m scheduled_tasks.market.ashare_trading_day --date "${CAL_DATE}" --github-output
+        else
+          python -m scheduled_tasks.market.ashare_trading_day --github-output
+        fi
         rc=$?
         set -e
         if [ "$rc" -ne 0 ]; then

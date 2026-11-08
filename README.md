@@ -38,7 +38,7 @@ GitHub Actions 定时任务：将 **Yahoo Finance（yfinance）** ETF 日 K、�
 - 新浪离岸日线 `fx_susdcnh`：美元兑人民币 `USDCNH.OTH`，收盘按 1 美元计。`indices.code` 用已有的 `OTH` 后缀。
 - 只写 `index_daily_metrics.close` 与 `price_source`（`csindex` / `fuyao` / `sina`）；PE/PB 传空，不覆盖红色火箭已有估值。
 - 入口：`python -m scheduled_tasks.jobs.sync_index_levels`。`FUYAO_API_KEY` 只给创业板R；没配时这一只失败，其余指数照常写入。
-- GHA：`Sync index levels`（工作日北京约 19:30；定时跑前做交易日闸门）。缺 `FUYAO_API_KEY` 不阻断这次任务。
+- 闹钟在数据库里：工作日北京时间 19:30、20:30、21:30 叫醒 `Sync index levels`，并写上当天日期。这一天的中证500收盘已经在库里就不再叫。手点运行可以不填日期。缺 `FUYAO_API_KEY` 不阻断这次任务。
 
 ### 官网双源校验
 
