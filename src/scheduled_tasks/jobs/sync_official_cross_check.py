@@ -12,7 +12,7 @@ import json
 import time
 import traceback
 from dataclasses import dataclass, field
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
 from typing import Any
 
@@ -512,6 +512,17 @@ def run(
     return summary
 
 
+def _parse_end(value: str | None) -> date | None:
+    """闹钟传入的截止日。空值表示用今天。"""
+    if value is None or not value.strip():
+        return None
+    try:
+        return datetime.strptime(value.strip(), "%Y-%m-%d").date()
+    except ValueError:
+        print(f"invalid --end {value!r}, expected YYYY-MM-DD")
+        raise SystemExit(2) from None
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description="Official cross-check: SSE ETF + CSI index vs DB."
@@ -532,6 +543,11 @@ def main(argv: list[str] | None = None) -> int:
         "--mode", choices=("incremental", "full"), default="incremental"
     )
     parser.add_argument("--lookback-bars", type=int, default=DEFAULT_LOOKBACK_BARS)
+    parser.add_argument(
+        "--end",
+        default=None,
+        help="比对截止日 YYYY-MM-DD。闹钟会传入 session_date，缺省为今天。",
+    )
     parser.add_argument(
         "--index-lookback-days", type=int, default=DEFAULT_INDEX_LOOKBACK_DAYS
     )
@@ -570,6 +586,7 @@ def main(argv: list[str] | None = None) -> int:
         apply_official=args.apply_official,
         from_pool=args.from_pool,
         skip_index=skip_index,
+        end=_parse_end(args.end),
     )
     print(
         f"{JOB_NAME} status={summary.status} "

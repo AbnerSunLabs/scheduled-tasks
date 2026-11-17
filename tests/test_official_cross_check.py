@@ -207,6 +207,22 @@ def test_main_requires_yes_for_apply() -> None:
     assert main(["--apply-official"]) == 2
 
 
+def test_main_passes_alarm_end_date() -> None:
+    summary = SyncSummary(status="ok")
+    with patch(
+        "scheduled_tasks.jobs.sync_official_cross_check.run",
+        return_value=summary,
+    ) as run:
+        assert main(["--from-pool", "--end=2026-11-16"]) == 0
+    assert run.call_args.kwargs["end"] == date(2026, 11, 16)
+
+
+def test_main_rejects_bad_end_date() -> None:
+    with pytest.raises(SystemExit) as caught:
+        main(["--end=2026/11/16"])
+    assert caught.value.code == 2
+
+
 def test_main_source_error_without_mismatch_exits_zero() -> None:
     summary = SyncSummary(
         status="partial",
