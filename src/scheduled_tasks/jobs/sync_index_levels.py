@@ -34,6 +34,8 @@ DEFAULT_LOOKBACK_DAYS = 45
 # 6 位中证样本走官网 perf。
 INDEX_LEVEL_SPECS: tuple[tuple[str, str, str, str], ...] = (
     ("000905.SH", "中证500", "宽基", "csindex"),
+    # 同花顺行情代码 1B0510。官网与指数表用 000510。
+    ("000510.SH", "中证A500", "宽基", "csindex"),
     ("000922.SH", "中证红利", "策略", "csindex"),
     ("399989.SZ", "中证医疗", "行业", "csindex"),
     ("000991.SH", "全指医药", "行业", "csindex"),

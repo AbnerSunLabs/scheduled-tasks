@@ -186,6 +186,7 @@ def test_sync_writes_close_only_and_keeps_valuation_null(monkeypatch: pytest.Mon
     assert summary.status == "success"
     assert summary.success_codes == [
         "000905.SH",
+        "000510.SH",
         "000922.SH",
         "399989.SZ",
         "000991.SH",
@@ -206,5 +207,5 @@ def test_sync_writes_close_only_and_keeps_valuation_null(monkeypatch: pytest.Mon
     ]
     assert {row["price_source"] for row in written} == {"csindex", "sina", "eastmoney"}
     outside_csindex = {"USDCNH.OTH", "HSI.HI", "HSHCI.HI", "SPX.OTH", "399006.SZ"}
-    assert sum(row["index_code"] not in outside_csindex for row in written) == 13
+    assert sum(row["index_code"] not in outside_csindex for row in written) == 14
     assert all(row["pe_ttm"] is None and row["valuation_source"] is None for row in written)
