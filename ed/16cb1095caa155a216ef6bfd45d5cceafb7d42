@@ -1,0 +1,25 @@
+tests/test_official_cross_check.py
+  s_56adf5e66eff35::t_3b8090263eb1c7 210-225
+src/scheduled_tasks/jobs/sync_official_cross_check.py
+  s_56adf5e66eff35::t_919c927b21fba2 589
+  s_56adf5e66eff35::t_488e0832cab4ac 515-525
+  s_56adf5e66eff35::t_313416785be7d6 15
+  s_56adf5e66eff35::t_6183e473b767ec 547-550
+  s_56adf5e66eff35::t_56e2824fcb4eaf 546
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "ed16cb1095caa155a216ef6bfd45d5cceafb7d42",
+  "prompts": {},
+  "sessions": {
+    "s_56adf5e66eff35": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "bbe26fb2-06c1-43bb-afff-40970dc40af9",
+        "model": "grok-4.7"
+      },
+      "human_author": "AbnerSun <sunyujiejohn@sina.com>"
+    }
+  }
+}
