@@ -1,0 +1,32 @@
+src/scheduled_tasks/jobs/sync_fund_nav.py
+  s_56adf5e66eff35::t_ba53b3310ec9cd 1
+  s_56adf5e66eff35::t_dd747224d117a9 18
+tests/test_fund_nav.py
+  s_56adf5e66eff35::t_7b0784a2bc3fc1 39
+tests/test_sync_index_levels.py
+  s_56adf5e66eff35::t_31e03af3a9e769 189
+  s_56adf5e66eff35::t_ec4fa71fd3e65a 210
+src/scheduled_tasks/jobs/sync_index_levels.py
+  s_56adf5e66eff35::t_50ab0683fe8407 37-38
+doc/ashare-trading-day-gate.md
+  s_56adf5e66eff35::t_7106dd2f640bc8 49
+doc/supabase-schema.md
+  s_56adf5e66eff35::t_8651ac3e04c911 35
+  s_56adf5e66eff35::t_91b118506720a3 326
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "61ed7e0fcdc603599416e8f169167f381f6038dd",
+  "prompts": {},
+  "sessions": {
+    "s_56adf5e66eff35": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "bbe26fb2-06c1-43bb-afff-40970dc40af9",
+        "model": "grok-4.7"
+      },
+      "human_author": "AbnerSun <sunyujiejohn@sina.com>"
+    }
+  }
+}
