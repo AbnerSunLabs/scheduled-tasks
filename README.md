@@ -34,6 +34,7 @@ GitHub Actions 定时任务：将 **Yahoo Finance（yfinance）** ETF 日 K、�
 ### 指数收盘
 
 - 中证官网 `index-perf`：中证500 `000905.SH`、中证红利 `000922.SH`、中证医疗 `399989.SZ`、全指消费 `000990.SH`、内地消费 `000942.SH`、中证传媒 `399971.SZ`、全指信息 `000993.SH`、证券公司 `399975.SZ`、中证红利低波动100 `930955.CSI`。
+- 东方财富日线：创业板R `399606.SZ`（`secid=0.399606`）。中证接口对它返回空。当天上海 15:00 前不写最后一根。
 - 新浪离岸日线 `fx_susdcnh`：美元兑人民币 `USDCNH.OTH`，收盘按 1 美元计。`indices.code` 用已有的 `OTH` 后缀。
 - 只写 `index_daily_metrics.close` 与 `price_source`（`csindex` / `eastmoney` / `sina`）；PE/PB 传空，不覆盖红色火箭已有估值。
 - 入口：`python -m scheduled_tasks.jobs.sync_index_levels`。

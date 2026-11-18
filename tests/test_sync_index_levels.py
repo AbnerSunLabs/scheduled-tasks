@@ -1,4 +1,4 @@
-"""跟踪指数收盘落库：中证样本走官方 perf，创业板R 走扶摇 REST。"""
+"""跟踪指数收盘落库：中证样本走官方 perf，创业板R 走东方财富日线。"""
 
 from __future__ import annotations
 
@@ -122,6 +122,14 @@ def test_eastmoney_secid_follows_the_index_code() -> None:
         http_get_json=fake_get,
     )
     assert "secid=0.399006" in seen[2]
+    fetch_eastmoney_index_closes(
+        "399606.SZ",
+        start=date(2026, 10, 27),
+        end=date(2026, 10, 27),
+        now=closed,
+        http_get_json=fake_get,
+    )
+    assert "secid=0.399606" in seen[3]
 
 
 def test_drops_close_stamped_on_the_request_start() -> None:
@@ -155,7 +163,7 @@ def test_sync_writes_close_only_and_keeps_valuation_null(monkeypatch: pytest.Mon
 
     def fake_eastmoney(index_code: str, *, start: date, end: date) -> list[dict]:
         assert end >= start
-        assert index_code in {"HSI.HI", "HSHCI.HI", "SPX.OTH", "399006.SZ"}
+        assert index_code in {"HSI.HI", "HSHCI.HI", "SPX.OTH", "399006.SZ", "399606.SZ"}
         return [{"trade_date": date(2026, 10, 20), "close": 23041.32}]
 
     monkeypatch.setattr("scheduled_tasks.jobs.sync_index_levels.fetch_index_daily_bars", fake_csi)
@@ -199,6 +207,7 @@ def test_sync_writes_close_only_and_keeps_valuation_null(monkeypatch: pytest.Mon
         "930955.CSI",
         "HSI.HI",
         "399006.SZ",
+        "399606.SZ",
         "HSHCI.HI",
         "000300.SH",
         "000852.SH",
@@ -206,6 +215,6 @@ def test_sync_writes_close_only_and_keeps_valuation_null(monkeypatch: pytest.Mon
         "USDCNH.OTH",
     ]
     assert {row["price_source"] for row in written} == {"csindex", "sina", "eastmoney"}
-    outside_csindex = {"USDCNH.OTH", "HSI.HI", "HSHCI.HI", "SPX.OTH", "399006.SZ"}
+    outside_csindex = {"USDCNH.OTH", "HSI.HI", "HSHCI.HI", "SPX.OTH", "399006.SZ", "399606.SZ"}
     assert sum(row["index_code"] not in outside_csindex for row in written) == 14
     assert all(row["pe_ttm"] is None and row["valuation_source"] is None for row in written)

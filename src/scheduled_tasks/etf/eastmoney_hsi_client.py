@@ -3,8 +3,8 @@
 接口（非公开 SLA，可能改版）：
 ``GET https://push2his.eastmoney.com/api/qt/stock/kline/get?secid=100.HSI&klt=101``
 
-``f51`` 是日期，``f53`` 是收盘。恒生、恒生医疗、创业板指、标普 500 分别用
-``100.HSI``、``124.HSHCI``、``0.399006``、``100.SPX``。
+``f51`` 是日期，``f53`` 是收盘。恒生、恒生医疗、创业板指、创业板R、标普 500 分别用
+``100.HSI``、``124.HSHCI``、``0.399006``、``0.399606``、``100.SPX``。
 港股 16:00（香港）、A 股 15:00（上海）、标普现金盘 16:00（美东）之前，不把当天最后一根当收盘。
 """
 
@@ -28,11 +28,12 @@ NY = ZoneInfo("America/New_York")
 SH = ZoneInfo("Asia/Shanghai")
 CLOSE_HOUR = 16
 USER_AGENT = "scheduled-tasks-eastmoney-hsi/1.0"
-# secid、收盘时区、收盘钟点。创业板指不在中证官网样本里；标普按美东收盘，不沿用港股。
+# secid、收盘时区、收盘钟点。创业板指、创业板R 不在中证官网样本里；标普按美东收盘，不沿用港股。
 INDEX_SESSIONS: dict[str, tuple[str, ZoneInfo, int]] = {
     "HSI.HI": ("100.HSI", HK, CLOSE_HOUR),
     "HSHCI.HI": ("124.HSHCI", HK, CLOSE_HOUR),
     "399006.SZ": ("0.399006", SH, 15),
+    "399606.SZ": ("0.399606", SH, 15),
     "SPX.OTH": ("100.SPX", NY, CLOSE_HOUR),
 }
 

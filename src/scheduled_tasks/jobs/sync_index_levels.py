@@ -48,8 +48,9 @@ INDEX_LEVEL_SPECS: tuple[tuple[str, str, str, str], ...] = (
     ("930955.CSI", "中证红利低波动100", "策略", "csindex"),
     # 恒生、恒生医疗不在中证样本。标普用指数表里已有的 SPX.OTH。
     ("HSI.HI", "恒生指数", "宽基", EASTMONEY_PRICE_SOURCE),
-    # 创业板指不在中证官网样本，官网返回空。深市指数走东财 secid=0.399006。
+    # 创业板指、创业板R 不在中证官网样本，官网返回空。深市指数走东财 secid=0.{code}。
     ("399006.SZ", "创业板指", "宽基", EASTMONEY_PRICE_SOURCE),
+    ("399606.SZ", "创业板R", "宽基", EASTMONEY_PRICE_SOURCE),
     ("HSHCI.HI", "恒生医疗", "行业", EASTMONEY_PRICE_SOURCE),
     ("000300.SH", "沪深300", "宽基", "csindex"),
     ("000852.SH", "中证1000", "宽基", "csindex"),
