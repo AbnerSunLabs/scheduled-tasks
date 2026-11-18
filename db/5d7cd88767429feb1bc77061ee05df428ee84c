@@ -1,0 +1,32 @@
+README.md
+  s_0feecf2cd95346::t_ca8b6c832f17c1 37
+tests/test_sync_index_levels.py
+  s_0feecf2cd95346::t_8862234146c76f 125-132
+  s_0feecf2cd95346::t_6ff1e49f576c2a 166
+  s_0feecf2cd95346::t_819981d82e9ec2 218
+  s_0feecf2cd95346::t_e74a1bd5aade3e 1
+  s_0feecf2cd95346::t_e238fca1ad4cb0 210
+src/scheduled_tasks/jobs/sync_index_levels.py
+  s_0feecf2cd95346::t_036e5e024f1f39 51,53
+doc/supabase-schema.md
+  s_0feecf2cd95346::t_61839501d5a489 199
+src/scheduled_tasks/etf/eastmoney_hsi_client.py
+  s_0feecf2cd95346::t_49a856881611d9 6-7
+  s_0feecf2cd95346::t_90439a4f5a825e 31,36
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "db5d7cd88767429feb1bc77061ee05df428ee84c",
+  "prompts": {},
+  "sessions": {
+    "s_0feecf2cd95346": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "36fabedc-ab25-4ad5-be3b-9c6a1bb56695",
+        "model": "grok-4.7"
+      },
+      "human_author": "AbnerSun <sunyujiejohn@sina.com>"
+    }
+  }
+}
