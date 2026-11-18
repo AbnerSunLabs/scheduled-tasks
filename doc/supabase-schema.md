@@ -32,7 +32,7 @@ RLS：
 | 表   | `sync_runs`              | 同步任务执行记录（含 `meta`）                        | **写入**                                           |
 | 表   | `etf_pool`               | ETF 当前池（PK=`etf_code`，非历史快照）              | **只读**                                           |
 | 表   | `etf_daily`              | ETF 日行情（OHLC + volume + 前/后复权 + 来源）       | **主写**                                           |
-| 表   | `fund_nav_daily`         | 场外基金单位净值（当前 004752、502010、022424）      | **主写** `sync_fund_nav`                           |
+| 表   | `fund_nav_daily`         | 场外基金单位净值（当前 004752、502010、022424、162412） | **主写** `sync_fund_nav`                           |
 | 表   | `index_valuation`        | 跟踪指数估值快照（当日/5y/10y PE）                   | **红色火箭可写**                                   |
 | 视图 | `index_latest_snapshot`  | 指数最新快照（价列仍恒 null + `index_valuation` PE） | 可读                                               |
 | 视图 | `index_detail_snapshot`  | 指数各维度最新日期（`latest_price_date` 仍恒 null）  | 可读                                               |
@@ -323,7 +323,7 @@ erDiagram
 
 | 列名 | 类型 | 约束 | 说明 |
 | --- | --- | --- | --- |
-| `fund_code` | `text` | **PK** | 6 位基金代码。当前写 `004752`、`502010`、`022424` |
+| `fund_code` | `text` | **PK** | 6 位基金代码。当前写 `004752`、`502010`、`022424`、`162412` |
 | `nav_date` | `date` | **PK** | 净值日期，上海日历日。领域名 `FundNav.date` |
 | `unit_nav` | `numeric` | NOT NULL, `> 0` | 单位净值 |
 | `source` | `text` | NOT NULL | 当前为 `eastmoney` |

@@ -116,7 +116,7 @@ create table if not exists etf_daily (
 create index if not exists etf_daily_trade_date_idx
   on etf_daily (trade_date desc);
 
--- 场外基金单位净值。主写：sync_fund_nav。页面只读。当前基金：004752、502010。
+-- 场外基金单位净值。主写：sync_fund_nav。页面只读。当前基金：004752、502010、022424、162412。
 create table if not exists fund_nav_daily (
   fund_code text not null,
   nav_date date not null,

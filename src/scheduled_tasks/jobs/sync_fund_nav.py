@@ -1,4 +1,4 @@
-"""把场外基金单位净值写入 fund_nav_daily。当前同步 004752、502010 与 022424。"""
+"""把场外基金单位净值写入 fund_nav_daily。当前同步 004752、502010、022424 与 162412。"""
 
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ from scheduled_tasks.etf.eastmoney_fund_nav import fetch_fund_nav
 from scheduled_tasks.jobs.sync_index_levels import resolve_session_date
 
 JOB_NAME = "sync_fund_nav"
-FUND_CODES: tuple[str, ...] = ("004752", "502010", "022424")
+FUND_CODES: tuple[str, ...] = ("004752", "502010", "022424", "162412")
 SUMMARY_PATH = Path("artifacts/sync_fund_nav_summary.json")
 
 

@@ -36,4 +36,4 @@ def test_session_is_covered_only_when_that_day_is_present() -> None:
     rows = [{"nav_date": "2026-11-06", "unit_nav": 1.18}]
     assert covers_session(rows, date(2026, 11, 6)) is True
     assert covers_session(rows, date(2026, 11, 7)) is False
-    assert FUND_CODES == ("004752", "502010", "022424")
+    assert FUND_CODES == ("004752", "502010", "022424", "162412")
