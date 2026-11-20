@@ -269,6 +269,9 @@ begin
     'dispatch-etf-kline-1810',
     'dispatch-etf-kline-1830',
     'dispatch-etf-kline-1900',
+    'dispatch-etf-kline-1600',
+    'dispatch-etf-kline-1630',
+    'dispatch-etf-kline-1700',
     'dispatch-etf-adj-1000',
     'dispatch-etf-adj-1100',
     'dispatch-index-valuation-1915',
@@ -289,10 +292,10 @@ $$;
 select cron.schedule('dispatch-etf-kline-0940', '40 1 * * 1-5', $$select private.dispatch_etf_kline_morning()$$);
 select cron.schedule('dispatch-etf-kline-1040', '40 2 * * 1-5', $$select private.dispatch_etf_kline_morning()$$);
 
--- 北京时间 18:10 / 18:30 / 19:00，试写当日 ETF 日 K。
-select cron.schedule('dispatch-etf-kline-1810', '10 10 * * 1-5', $$select private.dispatch_etf_kline_evening()$$);
-select cron.schedule('dispatch-etf-kline-1830', '30 10 * * 1-5', $$select private.dispatch_etf_kline_evening()$$);
-select cron.schedule('dispatch-etf-kline-1900', '0 11 * * 1-5', $$select private.dispatch_etf_kline_evening()$$);
+-- 北京时间 16:00 / 16:30 / 17:00，试写当日 ETF 日 K。
+select cron.schedule('dispatch-etf-kline-1600', '0 8 * * 1-5', $$select private.dispatch_etf_kline_evening()$$);
+select cron.schedule('dispatch-etf-kline-1630', '30 8 * * 1-5', $$select private.dispatch_etf_kline_evening()$$);
+select cron.schedule('dispatch-etf-kline-1700', '0 9 * * 1-5', $$select private.dispatch_etf_kline_evening()$$);
 
 -- 北京时间周日 10:00 / 11:00，复权巡检。
 select cron.schedule('dispatch-etf-adj-1000', '0 2 * * 0', $$select private.dispatch_etf_adj_check()$$);
