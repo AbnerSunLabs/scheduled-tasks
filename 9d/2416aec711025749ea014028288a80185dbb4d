@@ -1,0 +1,24 @@
+README.md
+  s_a99dae3dc9c248::t_e8ace2d29a5cc9 17
+src/scheduled_tasks/models/migrations/20261108_dispatch_remaining_jobs_from_db.sql
+  s_a99dae3dc9c248::t_06d907cc4065fa 295-298
+  s_a99dae3dc9c248::t_fa85d6c594f2b2 272-274
+src/scheduled_tasks/models/migrations/20261120_etf_kline_evening_1600.sql
+  s_a99dae3dc9c248::t_b0540ff00055e1 1-27
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "9d2416aec711025749ea014028288a80185dbb4d",
+  "prompts": {},
+  "sessions": {
+    "s_a99dae3dc9c248": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "61d3a8ff-9d12-4392-97a5-7af9f004aa11",
+        "model": "grok-4.7"
+      },
+      "human_author": "AbnerSun <sunyujiejohn@sina.com>"
+    }
+  }
+}
